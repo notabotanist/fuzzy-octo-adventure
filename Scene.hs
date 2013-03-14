@@ -5,10 +5,19 @@ import qualified Data.Vect as Vect
 import qualified Geom
 import Control.Monad (guard, mplus)
 import Control.Applicative ((<$>))
+import Data.Maybe (mapMaybe)
+import Data.List (minimumBy)
 
 -- |Represents the intersection of a ray with an object by the
 -- omega distance to the intersection point and a normal at that point
-type Intersection = (Float, Vect.Normal3)
+type Intersection = (Object, Float, Vect.Normal3)
+
+-- |Compare intersections by omega values
+compareIntersections :: Intersection -> Intersection -> Ordering
+compareIntersections (_, a, _) (_, b, _) = compare a b
+
+-- |RGB triplet with intensity values from 0 to 1.0
+type ColorF = (Float, Float, Float)
 
 -- |data type of objects which can be intersected by rays
 data Object 
@@ -17,11 +26,16 @@ data Object
   -- |Triangle data structure, with 3 points
   | Triangle Geom.Point Geom.Point Geom.Point
 
+-- |Colors are associated with objects at this point by type/location
+objColor :: Object -> ColorF
+objColor (Triangle _ _ _) = (1.0, 0, 0)
+objColor (Sphere c _) = (0, 1.0, 0)
+
 -- |Intersects an Object with a Ray, and Maybe returns the parametric
 -- distance to the point of intersection
-intersect :: Object -> Geom.Ray -> Maybe Intersection
+intersect :: Geom.Ray -> Object -> Maybe Intersection
 -- Sphere test
-intersect (Sphere c@(Vect.Vec3 xc yc zc) r) (Geom.Ray origin norm)
+intersect (Geom.Ray origin norm) s@(Sphere c@(Vect.Vec3 xc yc zc) r)
   | discrim < 0 = Nothing
 -- | discrim == 0 = Just $ (-bB + discrim') / 2
   | otherwise = pair <$> ming0 ((-bB + discrim') / 2) ((-bB - discrim') / 2)
@@ -34,15 +48,15 @@ intersect (Sphere c@(Vect.Vec3 xc yc zc) r) (Geom.Ray origin norm)
     discrim' = sqrt discrim
     ming0 a b = (guard (min a b > 0) >> return (min a b)) `mplus`
                 (guard (max a b > 0) >> return (max a b))
-    pair t = (t, Vect.mkNormal((isect t) &- c))
+    pair t = (s, t, Vect.mkNormal((isect t) &- c))
     isect t = (t `Vect.scalarMul` (Vect.fromNormal norm)) &+ origin
 
 -- Triangle test
-intersect (Triangle p0 p1 p2) (Geom.Ray origin norm)
+intersect (Geom.Ray origin norm) s@(Triangle p0 p1 p2)
   | divisor == 0 = Nothing
   | t < 0 = Nothing
   | u < 0 || v < 0 || u+v > 1 = Nothing
-  | otherwise = Just (t, norm')
+  | otherwise = Just (s, t, norm')
   where
     e1 = p1 &- p0
     e2 = p2 &- p0
@@ -54,3 +68,21 @@ intersect (Triangle p0 p1 p2) (Geom.Ray origin norm)
     u = (vP &. vT) / divisor
     v = (vQ &. (Vect.fromNormal norm)) / divisor
     norm' = Vect.mkNormal(e1 &^ e2)
+
+
+-- |Type class for Object containers which might be considered Scenes
+class Scene a where
+  trace :: a -> Geom.Ray -> ColorF
+  addObject :: a -> Object -> a
+
+data ListScene = ListScene ColorF [Object]
+
+instance Scene ListScene where
+  trace (ListScene background os) ray = case intersections of
+    [] -> background
+    ns -> objColor hitObject
+    where
+      intersections = mapMaybe (intersect ray) os
+      (hitObject, _, _) = minimumBy compareIntersections intersections
+
+  addObject (ListScene b os) o = ListScene b (o:os)
