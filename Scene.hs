@@ -37,7 +37,7 @@ intersect :: Geom.Ray -> Object -> Maybe Intersection
 -- Sphere test
 intersect (Geom.Ray origin norm) s@(Sphere c@(Vect.Vec3 xc yc zc) r)
   | discrim < 0 = Nothing
--- | discrim == 0 = Just $ (-bB + discrim') / 2
+--- | discrim == 0 = Just $ (-bB + discrim') / 2
   | otherwise = pair <$> ming0 ((-bB + discrim') / 2) ((-bB - discrim') / 2)
   where
     (Vect.Vec3 x0 y0 z0) = origin
@@ -46,6 +46,7 @@ intersect (Geom.Ray origin norm) s@(Sphere c@(Vect.Vec3 xc yc zc) r)
     bC = (x0 - xc)**2 + (y0 - yc)**2 + (z0 - zc)**2 - r**2
     discrim = bB * bB - 4 * bC
     discrim' = sqrt discrim
+    -- |returns least positive argument
     ming0 a b = (guard (min a b > 0) >> return (min a b)) `mplus`
                 (guard (max a b > 0) >> return (max a b))
     pair t = (s, t, Vect.mkNormal((isect t) &- c))
@@ -72,9 +73,12 @@ intersect (Geom.Ray origin norm) s@(Triangle p0 p1 p2)
 
 -- |Type class for Object containers which might be considered Scenes
 class Scene a where
+  -- |Trace a ray into the scene, producing some color in the image
   trace :: a -> Geom.Ray -> ColorF
+  -- |Add an object to the scene
   addObject :: a -> Object -> a
 
+-- |Implementation of Scene based on a plain list
 data ListScene = ListScene ColorF [Object]
 
 instance Scene ListScene where
