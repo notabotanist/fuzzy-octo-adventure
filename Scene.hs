@@ -19,6 +19,15 @@ compareIntersections (_, a, _) (_, b, _) = compare a b
 -- |RGB triplet with intensity values from 0 to 1.0
 type ColorF = (Float, Float, Float)
 
+scaleColor :: ColorF -> Float -> ColorF
+scaleColor (r, g, b) s = (r*s, g*s, b*s)
+
+intersectColor :: Intersection -> ColorF
+intersectColor (o, t, n) = scaleColor (objColor o) scale where
+  scale = back / ((t - front) * (t - front) + back)
+  back = 15
+  front = 3
+
 -- |data type of objects which can be intersected by rays
 data Object 
   -- |Sphere data structure, with center point and radius
@@ -96,9 +105,9 @@ data ListScene = ListScene ColorF [Object] deriving (Show)
 instance Scene ListScene where
   trace (ListScene background os) ray = case intersections of
     [] -> background
-    ns -> objColor hitObject
+    ns -> intersectColor closest
     where
       intersections = mapMaybe (intersect ray) os
-      (hitObject, _, _) = minimumBy compareIntersections intersections
+      closest = minimumBy compareIntersections intersections
 
   addObject (ListScene b os) o = ListScene b (o:os)
