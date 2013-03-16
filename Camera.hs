@@ -40,3 +40,29 @@ compileProj u v n eye = linPart .*. transPart where
   transPart = Vect.translation offset
   offset = Vect.Vec3 (eye' &. (f u)) (eye' &. (f v)) (eye' &. (f n))
   eye' = Vect.neg eye
+
+
+-- |Encapsulating type for pair of integers representing the width and
+-- height of a raster image
+data RasterProp = RasterProp { width :: Integer, height :: Integer }
+toPair (RasterProp w h) = (w, h)
+
+-- |Generates a list of rays to trace (in camera space) given some rendering
+-- properties
+rays :: Float      -- ^Focal length f
+     -> Float      -- ^Width of film plane
+     -> Float      -- ^Height of film plane
+     -> RasterProp -- ^Image width and height in pixels
+     -> [Geom.Ray] -- ^List of rays to trace
+rays f wP hP (RasterProp wI hI) = do
+  x <- [0..(wI - 1)]
+  y <- [0..(hI - 1)]
+  return (originRay (Vect.Vec3 (topLeftX + (fromInteger x) * pxWidth)
+                               (topLeftY - (fromInteger y) * pxHeight)
+                               f ))
+  where
+    topLeftX = (-wP) / 2 + pxWidth / 2
+    topLeftY = hP / 2 - pxHeight / 2
+    pxHeight = hP / (fromInteger hI)
+    pxWidth = wP / (fromInteger wI)
+    originRay p = Geom.Ray (Vect.Vec3 0 0 0) (Vect.mkNormal p)
