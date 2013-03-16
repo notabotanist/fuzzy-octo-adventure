@@ -40,6 +40,7 @@ myCamera :: Camera.Camera
 myCamera = Camera.mkCamera (Vect.Vec3 0 5 9.4)
             (Vect.mkNormal (Vect.Vec3 0 (-0.166769) (-0.98599604)))
             (Vect.mkNormal (Vect.Vec3 0 1 0))
+--myCamera = Camera.transCam (Vect.Vec3 0 5 9.4)
 
 -- |The produced image properties (500,325)
 myImgProp :: Camera.RasterProp

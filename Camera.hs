@@ -4,6 +4,7 @@ module Camera
   , RasterProp (RasterProp)
   , toPair
   , rays
+  , transCam
   ) where
 
 import Data.Vect ((&-),(&^),(&.),(.*.))
@@ -45,6 +46,13 @@ compileProj u v n eye = linPart .*. transPart where
   eye' = Vect.neg eye
 
 
+-- Debug
+transCam :: Geom.Point -> Camera
+transCam eyepoint = transMap where
+  proj = Vect.translation (Vect.neg eyepoint)
+  transMap (Scene.ListScene bg os) = Scene.ListScene bg (
+    map (Scene.transform proj) os)
+
 -- |Encapsulating type for pair of integers representing the width and
 -- height of a raster image
 data RasterProp = RasterProp { width :: Integer, height :: Integer }
@@ -62,7 +70,7 @@ rays f wP hP (RasterProp wI hI) = do
   x <- [0..(wI - 1)]
   return (originRay (Vect.Vec3 (topLeftX + (fromInteger x) * pxWidth)
                                (topLeftY - (fromInteger y) * pxHeight)
-                               f ))
+                               (-f) ))
   where
     topLeftX = (-wP) / 2 + pxWidth / 2
     topLeftY = hP / 2 - pxHeight / 2
