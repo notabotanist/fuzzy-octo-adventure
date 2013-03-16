@@ -5,6 +5,8 @@ import qualified Data.Vect as Vect
 import qualified Scene
 import qualified Geom
 import qualified Camera
+import qualified Codec.PPM.Binary as PPM
+import Data.Word (Word8)
 
 -- |Default background color
 bgColor :: Scene.ColorF
@@ -38,3 +40,23 @@ myCamera :: Camera.Camera
 myCamera = Camera.mkCamera (Vect.Vec3 0 5 9.4)
             (Vect.mkNormal (Vect.Vec3 0 (-0.166769) (-0.98599604)))
             (Vect.mkNormal (Vect.Vec3 0 1 0))
+
+-- |The produced image properties (500,325)
+myImgProp :: Camera.RasterProp
+myImgProp = Camera.RasterProp 500 325
+
+-- |Rays to be traced to form the final image.
+-- They depend on some camera properties.
+myRays :: [Geom.Ray]
+myRays = Camera.rays 1 1.776462 1.154701 myImgProp
+
+-- |Performs the raytrace to obtain a list of color values at each pixel
+doTrace :: [Scene.ColorF]
+doTrace = map (Scene.trace (myCamera myScene)) myRays
+
+colorFToWords :: Scene.ColorF -> (Word8, Word8, Word8)
+colorFToWords (r, g, b) = (s r, s g, s b) where
+  s = truncate.(*255)
+
+createImage :: String -> IO ()
+createImage fname = PPM.writePPM fname (Camera.toPair myImgProp) (map colorFToWords doTrace)
