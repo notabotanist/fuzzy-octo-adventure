@@ -1,6 +1,9 @@
 module Camera
   ( Camera
   , mkCamera
+  , RasterProp (RasterProp)
+  , toPair
+  , rays
   ) where
 
 import Data.Vect ((&-),(&^),(&.),(.*.))
@@ -55,8 +58,8 @@ rays :: Float      -- ^Focal length f
      -> RasterProp -- ^Image width and height in pixels
      -> [Geom.Ray] -- ^List of rays to trace
 rays f wP hP (RasterProp wI hI) = do
-  x <- [0..(wI - 1)]
   y <- [0..(hI - 1)]
+  x <- [0..(wI - 1)]
   return (originRay (Vect.Vec3 (topLeftX + (fromInteger x) * pxWidth)
                                (topLeftY - (fromInteger y) * pxHeight)
                                f ))
