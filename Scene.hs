@@ -71,6 +71,17 @@ intersect (Geom.Ray origin norm) s@(Triangle p0 p1 p2)
     norm' = Vect.mkNormal(e1 &^ e2)
 
 
+_tfPoint :: Vect.Proj4 -> Geom.Point -> Geom.Point
+_tfPoint mat = (Vect.trim).((flip Vect.rmul) mat').mk4 where
+  mat' = Vect.fromProjective mat
+  mk4 :: Vect.Vec3 -> Vect.Vec4
+  mk4 = Vect.extendWith 1
+
+transform :: Vect.Proj4 -> Object -> Object
+transform mat (Sphere c r) = (Sphere (_tfPoint mat c) r) where
+transform mat (Triangle p1 p2 p3) = (Triangle (tf p1) (tf p2) (tf p3)) where
+  tf = _tfPoint mat
+
 -- |Type class for Object containers which might be considered Scenes
 class Scene a where
   -- |Trace a ray into the scene, producing some color in the image

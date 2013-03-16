@@ -4,6 +4,7 @@ import Data.Vect ((&-),(&+))
 import qualified Data.Vect as Vect
 import qualified Scene
 import qualified Geom
+import qualified Camera
 
 -- |Default background color
 bgColor :: Scene.ColorF
