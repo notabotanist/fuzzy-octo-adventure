@@ -25,6 +25,7 @@ data Object
   = Sphere { center :: Geom.Point, radius :: Float }
   -- |Triangle data structure, with 3 points
   | Triangle Geom.Point Geom.Point Geom.Point
+  deriving (Show)
 
 -- |Colors are associated with objects at this point by type/location
 objColor :: Object -> ColorF
@@ -90,7 +91,7 @@ class Scene a where
   addObject :: a -> Object -> a
 
 -- |Implementation of Scene based on a plain list
-data ListScene = ListScene ColorF [Object]
+data ListScene = ListScene ColorF [Object] deriving (Show)
 
 instance Scene ListScene where
   trace (ListScene background os) ray = case intersections of
