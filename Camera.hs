@@ -4,7 +4,9 @@ module Camera
   , RasterProp (RasterProp)
   , toPair
   , rays
+-- debug
   , transCam
+  , compileProj
   ) where
 
 import Data.Vect ((&-),(&^),(&.),(.*.))
@@ -18,12 +20,12 @@ type Camera = Scene.ListScene -> Scene.ListScene
 -- |Creates the transforming function based on position, lookat, and up
 -- vectors.
 mkCamera :: Geom.Point   -- ^position
-         -> Vect.Normal3 -- ^lookat
+         -> Geom.Point   -- ^lookat
          -> Vect.Normal3 -- ^up
          -> (Scene.ListScene -> Scene.ListScene)
 mkCamera eyepoint lookat up = transMap
   where
-    n = Vect.mkNormal (eyepoint &- (Vect.fromNormal lookat))
+    n = Vect.mkNormal (eyepoint &- lookat)
     u = up &^ n
     v = n &^ u
     proj = compileProj u v n eyepoint

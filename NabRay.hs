@@ -38,7 +38,8 @@ myScene = buildScene (Scene.ListScene bgColor []) where
 -- |Creates the camera transformation according to previously found values
 myCamera :: Camera.Camera
 myCamera = Camera.mkCamera (Vect.Vec3 0 5 9.4)
-            (Vect.mkNormal (Vect.Vec3 0 (-0.166769) (-0.98599604)))
+--          (Vect.mkNormal (Vect.Vec3 0 (-0.166769) (-0.98599604)))
+                           (Vect.Vec3 0 4.833231 8.414004)
             (Vect.mkNormal (Vect.Vec3 0 1 0))
 --myCamera = Camera.transCam (Vect.Vec3 0 5 9.4)
 
