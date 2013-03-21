@@ -34,12 +34,21 @@ data Object
   = Sphere { center :: Geom.Point, radius :: Float }
   -- |Triangle data structure, with 3 points
   | Triangle Geom.Point Geom.Point Geom.Point
+  -- |Cylinder data structure: center point, radius, height
+  | Cylinder { center :: Geom.Point, axis :: Vect.Normal3,
+               radius :: Float, height :: Float }
   deriving (Show)
 
 -- |Colors are associated with objects at this point by type/location
 objColor :: Object -> ColorF
 objColor (Triangle _ _ _) = (1.0, 0, 0)
 objColor (Sphere c _) = (0, 1.0, 0)
+objColor (Cylinder _ _ _ _) = (1.0, 1.0, 0)
+
+-- |returns least positive argument
+ming0 :: Float -> Float -> Maybe Float
+ming0 a b = (guard (min a b > 0) >> return (min a b)) `mplus`
+            (guard (max a b > 0) >> return (max a b))
 
 -- |Intersects an Object with a Ray, and Maybe returns the parametric
 -- distance to the point of intersection
@@ -56,9 +65,6 @@ intersect (Geom.Ray origin norm) s@(Sphere c@(Vect.Vec3 xc yc zc) r)
     bC = (x0 - xc)**2 + (y0 - yc)**2 + (z0 - zc)**2 - r**2
     discrim = bB * bB - 4 * bC
     discrim' = sqrt discrim
-    -- |returns least positive argument
-    ming0 a b = (guard (min a b > 0) >> return (min a b)) `mplus`
-                (guard (max a b > 0) >> return (max a b))
     pair t = (s, t, Vect.mkNormal((isect t) &- c))
     isect t = (t `Vect.scalarMul` (Vect.fromNormal norm)) &+ origin
 
@@ -80,12 +86,39 @@ intersect (Geom.Ray origin norm) s@(Triangle p0 p1 p2)
     v = (vQ &. (Vect.fromNormal norm)) / divisor
     norm' = Vect.mkNormal(e1 &^ e2)
 
+-- Cylinder test: GeometricTools algorithm
+-- http://www.geometrictools.com/LibMathematics/Intersection/Intersection.html
+intersect (Geom.Ray rOrigin rDir) c@(Cylinder cOrigin cAxis cRadius cHeight)
+  | (abs dz) == 1 = parallelCase
+  | (abs dz) == 0 = perpCase
+  where
+    dz = cAxis &. rDir
+    (vU, vV) = complementBasis cAxis
+    vW = cAxis
+    diff = rOrigin &- cOrigin
+    vPx = vU &. diff
+    vPy = vV &. diff
+    vPz = vW &. diff
+    halfHeight = cHeight / 2
+    parallelCase
+      | radialSqrDist < 0 = Nothing -- Line outside cylinder, no intersect
+      | dz > 0 = trip <$> ming0 ((-vPz) - halfHeight) ((-vPz) + halfHeight)
+      where
+        radialSqrDist = cRadius * cRadius - vPx * vPx - vPy * vPy
+        trip t = (c, t, 
+
 
 _tfPoint :: Vect.Proj4 -> Geom.Point -> Geom.Point
 _tfPoint mat = (Vect.trim).((flip Vect.rmul) mat').mk4 where
   mat' = Vect.fromProjective mat
   mk4 :: Vect.Vec3 -> Vect.Vec4
   mk4 = Vect.extendWith 1
+
+_tfNorm :: Vect.Proj4 -> Vect.Normal3 -> Vect.Normal3
+_tfNorm mat = (Vect.mkNormal).(Vect.trim).((flip Vect.rmul) mat').mk4 where
+  mat' = Vect.fromProjective mat
+  mk4 :: Vect.Normal3 -> Vect.Vec4
+  mk4 = (Vect.extendWith 0).(Vect.fromNormal)
 
 transform :: Vect.Proj4 -> Object -> Object
 transform mat (Sphere c r) = (Sphere (_tfPoint mat c) r) where
