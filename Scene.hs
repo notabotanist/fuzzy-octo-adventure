@@ -102,10 +102,25 @@ intersect (Geom.Ray rOrigin rDir) c@(Cylinder cOrigin cAxis cRadius cHeight)
     halfHeight = cHeight / 2
     parallelCase
       | radialSqrDist < 0 = Nothing -- Line outside cylinder, no intersect
-      | dz > 0 = trip <$> ming0 ((-vPz) - halfHeight) ((-vPz) + halfHeight)
+      | dz > 0    = (\t -> (c, t, cAxis')) <$>
+                    ming0 ((-vPz) - halfHeight) ((-vPz) + halfHeight)
+      | otherwise = (\t -> (c, t, cAxis)) <$>
+                    ming0 (vPz - halfHeight) (vPz + halfHeight)
       where
         radialSqrDist = cRadius * cRadius - vPx * vPx - vPy * vPy
-        trip t = (c, t, 
+        cAxis' = (Vect.mkNormal).(Vect.neg).(Vect.fromNormal) cAxis
+    vDx = vU &. rDir
+    vDy = vV &. rDir
+    perpCase
+      | (abs dz) > halfHeight = Nothing -- Line outside of planes of end disks
+      | discr < 0 = Nothing -- Line does not intersect cylinder
+      | otherwise = trip <$> ming0 (((-a1) - root) / a2) (((-a1) + root) / a2)
+      where
+        a0 = vPx * vPx + vPy * vPy - cRadius * cRadius
+        a1 = vPx * vDx + vPy * vDy
+        a2 = vDx * vDx + vDy * vDy
+        discr = a1 * a1 - a0 * a2
+        root = sqrt discr
 
 
 _tfPoint :: Vect.Proj4 -> Geom.Point -> Geom.Point
