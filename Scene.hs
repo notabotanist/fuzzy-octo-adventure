@@ -5,7 +5,7 @@ import qualified Data.Vect as Vect
 import qualified Geom
 import Control.Monad (guard, mplus)
 import Control.Applicative ((<$>))
-import Data.Maybe (mapMaybe)
+import Data.Maybe (mapMaybe, catMaybes)
 import Data.List (minimumBy)
 
 -- |Represents the intersection of a ray with an object by the
@@ -94,12 +94,12 @@ intersect (Geom.Ray rOrigin rDir) c@(Cylinder cOrigin cAxis cRadius cHeight)
   | otherwise     = skewCase
   where
     dz = cAxis &. rDir
-    (vU, vV) = complementBasis cAxis
+    (vU, vV) = Geom.complementBasis cAxis
     vW = cAxis
     diff = rOrigin &- cOrigin
-    vPx = vU &. diff
-    vPy = vV &. diff
-    vPz = vW &. diff
+    vPx = (Vect.fromNormal vU) &. diff
+    vPy = (Vect.fromNormal vV) &. diff
+    vPz = (Vect.fromNormal vW) &. diff
     halfHeight = cHeight / 2
     parallelCase
       | radialSqrDist < 0 = Nothing -- Line outside cylinder, no intersect
@@ -109,22 +109,55 @@ intersect (Geom.Ray rOrigin rDir) c@(Cylinder cOrigin cAxis cRadius cHeight)
                     ming0 (vPz - halfHeight) (vPz + halfHeight)
       where
         radialSqrDist = cRadius * cRadius - vPx * vPx - vPy * vPy
-        cAxis' = (Vect.mkNormal).(Vect.neg).(Vect.fromNormal) cAxis
+    cAxis' = Vect.mkNormal ((Vect.neg).(Vect.fromNormal) $ cAxis)
     vDx = vU &. rDir
     vDy = vV &. rDir
+    rSqr = cRadius * cRadius
     perpCase
-      | (abs dz) > halfHeight = Nothing -- Line outside of planes of end disks
+      | (abs vPz) > halfHeight = Nothing -- Line outside of planes of end disks
       | discr < 0 = Nothing -- Line does not intersect cylinder
       | otherwise = trip <$> ming0 (((-a1) - root) / a2) (((-a1) + root) / a2)
       where
-        a0 = vPx * vPx + vPy * vPy - cRadius * cRadius
+        a0 = vPx * vPx + vPy * vPy - rSqr
         a1 = vPx * vDx + vPy * vDy
         a2 = vDx * vDx + vDy * vDy
         discr = a1 * a1 - a0 * a2
         root = sqrt discr
-    skewCase = leastT.(take 2).catMaybes [ (testPlane (-halfHeight)),
-                                  (testPlane halfHeight),
-                                  (
+        trip t = (c, t, norm t)
+        norm t = Vect.mkNormal((isect t) &- axisPt)
+        axisPt = cOrigin &+ (vPz `Vect.scalarMul` (Vect.fromNormal cAxis))
+    skewCase = leastT.(take 2).catMaybes $
+      [ ((\t -> (c, t, cAxis')) <$> (testPlane (-halfHeight))),
+        ((\t -> (c, t, cAxis)) <$> (testPlane halfHeight)),
+        (testWall (-1)),
+        (testWall 1) ]
+    leastT :: [Intersection] -> Maybe Intersection
+    leastT [] = Nothing
+    leastT ss = Just (minimumBy compareIntersections ss)
+    testPlane hh
+      | (xTmp * xTmp + yTmp * yTmp) <= rSqr = Just tp
+      | otherwise = Nothing
+      where
+        tp = (hh - vPz) / dz
+        xTmp = vPx + tp * vDx
+        yTmp = vPy + tp * vDy
+    testWall rootFactor
+      | discr < 0 = Nothing
+      | (min t0 t1) <= tValue && tValue <= (max t0 t1) = Just (c, tValue, wNorm)
+      | otherwise = Nothing
+      where
+        a0 = vPx * vPx + vPy * vPy - rSqr
+        a1 = vPx * vDx + vPy * vDy
+        a2 = vDx * vDx + vDy * vDy
+        discr = a1 * a1 - a0 * a2
+        root = sqrt discr
+        tValue = ((-a1) + (rootFactor * root)) / a2
+        t0 = ((-halfHeight) - vPz) / dz
+        t1 = (halfHeight - vPz) / dz
+        wNorm = Vect.mkNormal((isect tValue) &- axisPt)
+        axisPt = cOrigin &+ (z `Vect.scalarMul` (Vect.fromNormal cAxis))
+        z = tValue * dz + vPz
+    isect t = rOrigin &+ (t `Vect.scalarMul` (Vect.fromNormal rDir))
 
 
 _tfPoint :: Vect.Proj4 -> Geom.Point -> Geom.Point
@@ -143,6 +176,8 @@ transform :: Vect.Proj4 -> Object -> Object
 transform mat (Sphere c r) = (Sphere (_tfPoint mat c) r) where
 transform mat (Triangle p1 p2 p3) = (Triangle (tf p1) (tf p2) (tf p3)) where
   tf = _tfPoint mat
+transform mat (Cylinder c a r h) =
+  Cylinder (_tfPoint mat c) (_tfNorm mat a) r h
 
 -- |Type class for Object containers which might be considered Scenes
 class Scene a where

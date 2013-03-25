@@ -35,6 +35,11 @@ myScene = buildScene (Scene.ListScene bgColor []) where
   addMetal = addObject' (Scene.Sphere (Vect.Vec3 4 3 (-4)) 3)
   addClear = addObject' (Scene.Sphere (Vect.Vec3 0 5 0) 3)
 
+-- |Adds a cylinder extra to myScene
+extraScene :: Scene.ListScene
+extraScene = Scene.addObject myScene cyl where
+  cyl = Scene.Cylinder (Vect.Vec3 4 2 1) (Vect.mkNormal (Vect.Vec3 0 1 0)) 1 2
+
 -- |Creates the camera transformation according to previously found values
 myCamera :: Camera.Camera
 myCamera = Camera.mkCamera (Vect.Vec3 0 5 9.4)
@@ -62,3 +67,16 @@ colorFToWords (r, g, b) = (s r, s g, s b) where
 
 createImage :: String -> IO ()
 createImage fname = PPM.writePPM fname (Camera.toPair myImgProp) (map colorFToWords doTrace)
+
+-- |Renders a specified scene with specified camera, then writes to file
+createImage' :: Scene.ListScene -> Camera.Camera -> String -> IO ()
+createImage' scene cam fname = PPM.writePPM fname (Camera.toPair myImgProp) dat
+  where
+    dat = map colorFToWords (map (Scene.trace (cam scene)) myRays)
+
+-- |Performs two renders: first the standard to "test.ppm", then the extra
+-- with cylinder to "cylinderTest.ppm"
+main :: IO ()
+main = do
+  createImage "test.ppm"
+  createImage' extraScene myCamera "cylinderTest.ppm"
