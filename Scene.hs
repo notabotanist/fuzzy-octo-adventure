@@ -91,6 +91,7 @@ intersect (Geom.Ray origin norm) s@(Triangle p0 p1 p2)
 intersect (Geom.Ray rOrigin rDir) c@(Cylinder cOrigin cAxis cRadius cHeight)
   | (abs dz) == 1 = parallelCase
   | (abs dz) == 0 = perpCase
+  | otherwise     = skewCase
   where
     dz = cAxis &. rDir
     (vU, vV) = complementBasis cAxis
@@ -121,6 +122,9 @@ intersect (Geom.Ray rOrigin rDir) c@(Cylinder cOrigin cAxis cRadius cHeight)
         a2 = vDx * vDx + vDy * vDy
         discr = a1 * a1 - a0 * a2
         root = sqrt discr
+    skewCase = leastT.(take 2).catMaybes [ (testPlane (-halfHeight)),
+                                  (testPlane halfHeight),
+                                  (
 
 
 _tfPoint :: Vect.Proj4 -> Geom.Point -> Geom.Point
