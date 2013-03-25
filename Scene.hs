@@ -139,6 +139,7 @@ intersect (Geom.Ray rOrigin rDir) c@(Cylinder cOrigin cAxis cRadius cHeight)
     leastT [] = Nothing
     leastT ss = Just (minimumBy compareIntersections ss)
     testPlane hh
+      | tp < 0 = Nothing
       | (xTmp * xTmp + yTmp * yTmp) <= rSqr = Just tp
       | otherwise = Nothing
       where
@@ -147,6 +148,7 @@ intersect (Geom.Ray rOrigin rDir) c@(Cylinder cOrigin cAxis cRadius cHeight)
         yTmp = vPy + tp * vDy
     testWall rootFactor
       | discr < 0 = Nothing
+      | tValue < 0 = Nothing
       | (min t0 t1) <= tValue && tValue <= (max t0 t1) = Just (c, tValue, wNorm)
       | otherwise = Nothing
       where
@@ -165,13 +167,25 @@ intersect (Geom.Ray rOrigin rDir) c@(Cylinder cOrigin cAxis cRadius cHeight)
 
 -- Recurse for CSG constructs
 -- For Union, choose the closer intersection
-intersect ray (Union a b) = case (mapMaybe (intersect ray) [a, b]) of
+intersect ray u@(Union a b) = case (mapMaybe (intersect ray) [a, b]) of
   [] -> Nothing   -- Neither intersect
   ss -> Just (minimumBy compareIntersections ss)
 -- For Isect, choose the further intersection iff there are 2
-intersect ray (Isect a b) = case (mapMaybe (intersect ray) [a, b]) of
-  [j,k] -> Just (maximumBy compareIntersections [j,k])
+intersect ray i@(Isect a b) = case (mapMaybe (intersect ray) [a, b]) of
+  [j,k] -> case (compareIntersections j k) of
+    LT -> checkContained j k
+    EQ -> Nothing
+    GT -> checkContained k j
   _     -> Nothing
+  where
+    (Geom.Ray rOrigin rDir) = ray
+    epsilon = 0.001
+    checkContained (fObj, fT, _) candidate@(_, cT, _) = do
+      let rOff = (fT + epsilon) `Vect.scalarMul` (Vect.fromNormal rDir)
+      let ray' = Geom.Ray (rOrigin &+ rOff) rDir
+      (_, rT, _) <- intersect ray' fObj
+      guard (cT < (rT + fT))
+      return candidate
 
 
 _tfPoint :: Vect.Proj4 -> Geom.Point -> Geom.Point

@@ -29,9 +29,12 @@ makeFloorQuad o e = [t1, t2] where
 sampleCSG :: Scene.Object
 sampleCSG = (Scene.Isect sph (Scene.Union cyl1 cyl2)) where
   sph = Scene.Sphere (Vect.Vec3 (-1) 4 1) 2
-  cyl1 = Scene.Cylinder (Vect.Vec3 (-1.5) 4 3) vert 1 3
-  cyl2 = Scene.Cylinder (Vect.Vec3 (-0.5) 4 3) vert 1 3
+  cyl1 = Scene.Cylinder (Vect.Vec3 (-1.6) 3 3) vert 1 1
+  cyl2 = Scene.Cylinder (Vect.Vec3 (-0.4) 4 3) vert 1 3
   vert = Vect.mkNormal (Vect.Vec3 0 1 0)
+
+csgScene :: Scene.ListScene
+csgScene = Scene.ListScene bgColor (sampleCSG:(makeFloorQuad (Vect.Vec3 7 0 (-7)) 13))
 
 -- |Creates a scene and populates it with the assignment's objects
 myScene :: Scene.ListScene
@@ -46,9 +49,6 @@ myScene = buildScene (Scene.ListScene bgColor []) where
 extraScene :: Scene.ListScene
 extraScene = Scene.addObject myScene cyl where
   cyl = Scene.Cylinder (Vect.Vec3 4 2 1) (Vect.mkNormal (Vect.Vec3 0 1 0)) 1 2
-
-csgScene :: Scene.ListScene
-csgScene = Scene.addObject myScene sampleCSG
 
 -- |Creates the camera transformation according to previously found values
 myCamera :: Camera.Camera
