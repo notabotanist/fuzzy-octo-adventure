@@ -6,7 +6,7 @@ import qualified Geom
 import Control.Monad (guard, mplus)
 import Control.Applicative ((<$>))
 import Data.Maybe (mapMaybe, catMaybes)
-import Data.List (minimumBy)
+import Data.List (minimumBy, maximumBy)
 
 -- |Represents the intersection of a ray with an object by the
 -- omega distance to the intersection point and a normal at that point
@@ -37,6 +37,10 @@ data Object
   -- |Cylinder data structure: center point, radius, height
   | Cylinder { center :: Geom.Point, axis :: Vect.Normal3,
                radius :: Float, height :: Float }
+  -- |CSG object union
+  | Union Object Object
+  -- |CSG object intersection
+  | Isect Object Object
   deriving (Show)
 
 -- |Colors are associated with objects at this point by type/location
@@ -158,6 +162,16 @@ intersect (Geom.Ray rOrigin rDir) c@(Cylinder cOrigin cAxis cRadius cHeight)
         axisPt = cOrigin &+ (z `Vect.scalarMul` (Vect.fromNormal cAxis))
         z = tValue * dz + vPz
     isect t = rOrigin &+ (t `Vect.scalarMul` (Vect.fromNormal rDir))
+
+-- Recurse for CSG constructs
+-- For Union, choose the closer intersection
+intersect ray (Union a b) = case (mapMaybe (intersect ray) [a, b]) of
+  [] -> Nothing   -- Neither intersect
+  ss -> Just (minimumBy compareIntersections ss)
+-- For Isect, choose the further intersection iff there are 2
+intersect ray (Isect a b) = case (mapMaybe (intersect ray) [a, b]) of
+  [j,k] -> Just (maximumBy compareIntersections [j,k])
+  _     -> Nothing
 
 
 _tfPoint :: Vect.Proj4 -> Geom.Point -> Geom.Point
