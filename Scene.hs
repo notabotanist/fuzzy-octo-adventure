@@ -192,6 +192,8 @@ transform mat (Triangle p1 p2 p3) = (Triangle (tf p1) (tf p2) (tf p3)) where
   tf = _tfPoint mat
 transform mat (Cylinder c a r h) =
   Cylinder (_tfPoint mat c) (_tfNorm mat a) r h
+transform mat (Union a b) = (Union (transform mat a) (transform mat b))
+transform mat (Isect a b) = (Isect (transform mat a) (transform mat b))
 
 -- |Type class for Object containers which might be considered Scenes
 class Scene a where
