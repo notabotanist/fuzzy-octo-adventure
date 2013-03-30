@@ -179,22 +179,34 @@ transform mat (Triangle p1 p2 p3) = (Triangle (tf p1) (tf p2) (tf p3)) where
 transform mat (Cylinder c a r h) =
   Cylinder (_tfPoint mat c) (_tfNorm mat a) r h
 
--- |Type class for Object containers which might be considered Scenes
-class Scene a where
+-- |data type for Object containers which might be considered Scenes
+data Scene = Scene { 
   -- |Trace a ray into the scene, producing some color in the image
-  trace :: a -> Geom.Ray -> ColorF
+  trace :: Geom.Ray -> ColorF,
   -- |Add an object to the scene
-  addObject :: a -> Object -> a
+  addObject :: Object -> Scene,
+  -- |Map an object transformation across all objects in the scene
+  mapTransform :: (Object -> Object) -> Scene
+}
 
 -- |Implementation of Scene based on a plain list
 data ListScene = ListScene ColorF [Object] deriving (Show)
 
-instance Scene ListScene where
-  trace (ListScene background os) ray = case intersections of
+-- |Poses an object into this ListScene
+listScenePose :: Object -> ListScene -> ListScene
+listScenePose o (ListScene background os) = ListScene background (o:os)
+
+--instance Scene ListScene where
+toScene :: ListScene -> Scene
+toScene s@(ListScene background os) = Scene (lTrace)
+                                          (lAddObject)
+                                          (lMapTrans)
+  where
+  lTrace ray = case intersections of
     [] -> background
     ns -> intersectColor closest
     where
       intersections = mapMaybe (intersect ray) os
       closest = minimumBy compareIntersections intersections
-
-  addObject (ListScene b os) o = ListScene b (o:os)
+  lAddObject = toScene.((flip listScenePose) s)
+  lMapTrans f = toScene $ ListScene background (map f os)
