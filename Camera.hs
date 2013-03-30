@@ -4,9 +4,6 @@ module Camera
   , RasterProp (RasterProp)
   , toPair
   , rays
--- debug
-  , transCam
-  , compileProj
   ) where
 
 import Data.Vect ((&-),(&^),(&.),(.*.))
@@ -15,22 +12,23 @@ import qualified Geom
 import qualified Scene
 
 -- |A Camera is a function which transforms a scene into camera coordinates
-type Camera = Scene.ListScene -> Scene.ListScene
+type Camera = Scene.Scene -> Scene.Scene
 
 -- |Creates the transforming function based on position, lookat, and up
 -- vectors.
 mkCamera :: Geom.Point   -- ^position
          -> Geom.Point   -- ^lookat
          -> Vect.Normal3 -- ^up
-         -> (Scene.ListScene -> Scene.ListScene)
+         -> Camera
 mkCamera eyepoint lookat up = transMap
   where
     n = Vect.mkNormal (eyepoint &- lookat)
     u = up &^ n
     v = n &^ u
     proj = compileProj u v n eyepoint
-    transMap (Scene.ListScene bg os) = Scene.ListScene bg (
-      map (Scene.transform proj) os)
+    transMap = (flip Scene.mapTransform) (Scene.transform proj)
+    --transMap (Scene.ListScene bg os) = Scene.ListScene bg (
+    --  map (Scene.transform proj) os)
 
 -- |Creates the projective matrix to transform points into camera space given
 -- the axes and an eyepoint
@@ -49,11 +47,13 @@ compileProj u v n eye = linPart .*. transPart where
 
 
 -- Debug
+{-
 transCam :: Geom.Point -> Camera
 transCam eyepoint = transMap where
   proj = Vect.translation (Vect.neg eyepoint)
   transMap (Scene.ListScene bg os) = Scene.ListScene bg (
     map (Scene.transform proj) os)
+-}
 
 -- |Encapsulating type for pair of integers representing the width and
 -- height of a raster image

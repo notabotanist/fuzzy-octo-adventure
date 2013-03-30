@@ -28,16 +28,15 @@ makeFloorQuad o e = [t1, t2] where
 
 -- |Creates a scene and populates it with the assignment's objects
 myScene :: Scene.ListScene
-myScene = buildScene (Scene.ListScene bgColor []) where
-  buildScene = addFloor.addMetal.addClear
-  addObject' = flip Scene.addObject
-  addFloor s = foldl Scene.addObject s (makeFloorQuad (Vect.Vec3 7 0 (-7)) 13)
-  addMetal = addObject' (Scene.Sphere (Vect.Vec3 4 3 (-4)) 3)
-  addClear = addObject' (Scene.Sphere (Vect.Vec3 0 5 0) 3)
+myScene = Scene.ListScene bgColor objects where
+  objects = floor ++ [metal, clear]
+  floor = makeFloorQuad (Vect.Vec3 7 0 (-7)) 13
+  metal = Scene.Sphere (Vect.Vec3 4 3 (-4)) 3
+  clear = Scene.Sphere (Vect.Vec3 0 5 0) 3
 
 -- |Adds a cylinder extra to myScene
 extraScene :: Scene.ListScene
-extraScene = Scene.addObject myScene cyl where
+extraScene = Scene.listScenePose cyl myScene where
   cyl = Scene.Cylinder (Vect.Vec3 4 2 1) (Vect.mkNormal (Vect.Vec3 0 1 0)) 1 2
 
 -- |Creates the camera transformation according to previously found values
@@ -59,7 +58,7 @@ myRays = Camera.rays 1 1.776462 1.154701 myImgProp
 
 -- |Performs the raytrace to obtain a list of color values at each pixel
 doTrace :: [Scene.ColorF]
-doTrace = map (Scene.trace (myCamera myScene)) myRays
+doTrace = map (Scene.trace (myCamera (Scene.toScene myScene))) myRays
 
 colorFToWords :: Scene.ColorF -> (Word8, Word8, Word8)
 colorFToWords (r, g, b) = (s r, s g, s b) where
@@ -72,7 +71,7 @@ createImage fname = PPM.writePPM fname (Camera.toPair myImgProp) (map colorFToWo
 createImage' :: Scene.ListScene -> Camera.Camera -> String -> IO ()
 createImage' scene cam fname = PPM.writePPM fname (Camera.toPair myImgProp) dat
   where
-    dat = map colorFToWords (map (Scene.trace (cam scene)) myRays)
+    dat = map colorFToWords (map (Scene.trace (cam (Scene.toScene scene))) myRays)
 
 -- |Performs two renders: first the standard to "test.ppm", then the extra
 -- with cylinder to "cylinderTest.ppm"
