@@ -183,8 +183,6 @@ transform mat (Cylinder c a r h) =
 data Scene = Scene { 
   -- |Trace a ray into the scene, producing some color in the image
   trace :: Geom.Ray -> ColorF,
-  -- |Add an object to the scene
-  addObject :: Object -> Scene,
   -- |Map an object transformation across all objects in the scene
   mapTransform :: (Object -> Object) -> Scene
 }
@@ -199,7 +197,6 @@ listScenePose o (ListScene background os) = ListScene background (o:os)
 --instance Scene ListScene where
 toScene :: ListScene -> Scene
 toScene s@(ListScene background os) = Scene (lTrace)
-                                          (lAddObject)
                                           (lMapTrans)
   where
   lTrace ray = case intersections of
@@ -208,5 +205,4 @@ toScene s@(ListScene background os) = Scene (lTrace)
     where
       intersections = mapMaybe (intersect ray) os
       closest = minimumBy compareIntersections intersections
-  lAddObject = toScene.((flip listScenePose) s)
   lMapTrans f = toScene $ ListScene background (map f os)
