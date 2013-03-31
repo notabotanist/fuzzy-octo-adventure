@@ -114,8 +114,10 @@ litTrace (LitScene background obs lis) ray = case intersections of
     visible light = case mapMaybe (intersect (shadow light)) obs of
       [] -> True
       ns -> let (_, (_,t,_)) = minimumBy compareExIsects ns in (dist light) < t
-    shadow light = Geom.Ray (point idata)
+    shadow light = Geom.Ray shadowPoint
                             (Vect.mkNormal ((location light) &- (point idata)))
+    shadowPoint = (point idata) &+
+      (0.001 `Vect.scalarMul` (Vect.fromNormal (normal idata)))
     dist light = Vect.len ((location light) &- (point idata))
 
 -- |Maps a transformation over all objects and lights
