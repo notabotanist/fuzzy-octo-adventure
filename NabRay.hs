@@ -50,6 +50,11 @@ extraScene = Light.insertLitObj cyl myScene where
   cyl = Light.LitObject (Light.plasticMat ambient (1, 1, 0))
     (Scene.Cylinder (Vect.Vec3 4 2 1) (Vect.mkNormal (Vect.Vec3 0 1 0)) 1 2)
 
+-- |Adds a light extra to myScene
+extraLight :: Light.LitScene
+extraLight = Light.insertLight red myScene where
+  red = Light.Point (Vect.Vec3 (-5) 1 0) (Vect.Vec3 1.5 0 0)
+
 -- |Creates the camera transformation according to previously found values
 myCamera :: Camera.Camera
 myCamera = Camera.mkCamera (Vect.Vec3 0 5 9.4)
