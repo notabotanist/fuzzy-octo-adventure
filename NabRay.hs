@@ -47,7 +47,7 @@ myScene = Light.LitScene bgColor objects lights where
 -- |Adds a cylinder extra to myScene
 extraScene :: Light.LitScene
 extraScene = Light.insertLitObj cyl myScene where
-  cyl = Light.LitObject (Light.plasticMat ambient (0, 1, 1))
+  cyl = Light.LitObject (Light.plasticMat ambient (1, 1, 0))
     (Scene.Cylinder (Vect.Vec3 4 2 1) (Vect.mkNormal (Vect.Vec3 0 1 0)) 1 2)
 
 -- |Creates the camera transformation according to previously found values

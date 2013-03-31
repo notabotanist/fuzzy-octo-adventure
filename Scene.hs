@@ -135,6 +135,7 @@ intersect (Geom.Ray rOrigin rDir) c@(Cylinder cOrigin cAxis cRadius cHeight)
     leastT [] = Nothing
     leastT ss = Just (minimumBy compareIntersections ss)
     testPlane hh
+      | tp < 0 = Nothing
       | (xTmp * xTmp + yTmp * yTmp) <= rSqr = Just tp
       | otherwise = Nothing
       where
@@ -143,6 +144,7 @@ intersect (Geom.Ray rOrigin rDir) c@(Cylinder cOrigin cAxis cRadius cHeight)
         yTmp = vPy + tp * vDy
     testWall rootFactor
       | discr < 0 = Nothing
+      | tValue < 0 = Nothing
       | (min t0 t1) <= tValue && tValue <= (max t0 t1) = Just (c, tValue, wNorm)
       | otherwise = Nothing
       where
