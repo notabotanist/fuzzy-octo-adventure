@@ -40,7 +40,7 @@ plasticMat ambient (dr, dg, db) = Phong ka kd ks ke where
   kd = Vect.Vec3 dr dg db
   ka = ambient &! kd
   ks = Vect.Vec3 1 1 1
-  ke = 2
+  ke = 16
 
 -- |Container for vectors necessary during illumination
 data Intersect = Intersect
