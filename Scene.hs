@@ -135,6 +135,7 @@ intersect (Geom.Ray rOrigin rDir) c@(Cylinder cOrigin cAxis cRadius cHeight)
     leastT [] = Nothing
     leastT ss = Just (minimumBy compareIntersections ss)
     testPlane hh
+      | tp < 0 = Nothing
       | (xTmp * xTmp + yTmp * yTmp) <= rSqr = Just tp
       | otherwise = Nothing
       where
@@ -143,6 +144,7 @@ intersect (Geom.Ray rOrigin rDir) c@(Cylinder cOrigin cAxis cRadius cHeight)
         yTmp = vPy + tp * vDy
     testWall rootFactor
       | discr < 0 = Nothing
+      | tValue < 0 = Nothing
       | (min t0 t1) <= tValue && tValue <= (max t0 t1) = Just (c, tValue, wNorm)
       | otherwise = Nothing
       where
@@ -179,22 +181,30 @@ transform mat (Triangle p1 p2 p3) = (Triangle (tf p1) (tf p2) (tf p3)) where
 transform mat (Cylinder c a r h) =
   Cylinder (_tfPoint mat c) (_tfNorm mat a) r h
 
--- |Type class for Object containers which might be considered Scenes
-class Scene a where
+-- |data type for Object containers which might be considered Scenes
+data Scene = Scene { 
   -- |Trace a ray into the scene, producing some color in the image
-  trace :: a -> Geom.Ray -> ColorF
-  -- |Add an object to the scene
-  addObject :: a -> Object -> a
+  trace :: Geom.Ray -> ColorF,
+  -- |Map an object transformation across all objects in the scene
+  mapTransform :: (Object -> Object) -> Scene
+}
 
 -- |Implementation of Scene based on a plain list
 data ListScene = ListScene ColorF [Object] deriving (Show)
 
-instance Scene ListScene where
-  trace (ListScene background os) ray = case intersections of
+-- |Poses an object into this ListScene
+listScenePose :: Object -> ListScene -> ListScene
+listScenePose o (ListScene background os) = ListScene background (o:os)
+
+--instance Scene ListScene where
+toScene :: ListScene -> Scene
+toScene s@(ListScene background os) = Scene (lTrace)
+                                          (lMapTrans)
+  where
+  lTrace ray = case intersections of
     [] -> background
     ns -> intersectColor closest
     where
       intersections = mapMaybe (intersect ray) os
       closest = minimumBy compareIntersections intersections
-
-  addObject (ListScene b os) o = ListScene b (o:os)
+  lMapTrans f = toScene $ ListScene background (map f os)

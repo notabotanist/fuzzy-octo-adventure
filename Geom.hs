@@ -3,6 +3,7 @@ module Geom
   ( Point
   , Ray(..)
   , complementBasis
+  , eval
   ) where
 
 import Data.Vect (Vec3, Normal3)
@@ -11,6 +12,10 @@ import qualified Data.Vect as Vect
 type Point = Vec3
 
 data Ray = Ray { origin :: Point, direction :: Normal3 }
+
+eval :: Ray -> Float -> Point
+eval (Ray origin dir) t = origin Vect.&+
+                          (Vect.scalarMul t (Vect.fromNormal dir))
 
 -- |From an input normal W, creates mutually perpendicular normals U and V
 -- such that {U,V,W} is an orthonormal basis (set of axes?).
