@@ -33,6 +33,10 @@ data IlluminationModel
           Coefficients -- ^coefficients of diffuse component (kd)
           Coefficients -- ^coefficients of specular component (ks)
           Float        -- ^specular exponent (ke)
+  -- |Generic texture-mapping type
+  | Texture
+    -- |Function encapsulating the whole texture mapping pipeline
+    (Vect.Vec3 -> IlluminationModel)
 
 -- |creates a colored plastic-like material
 plasticMat :: Radiance -> Scene.ColorF -> IlluminationModel
@@ -41,6 +45,16 @@ plasticMat ambient (dr, dg, db) = Phong ka kd ks ke where
   ka = ambient &! kd
   ks = Vect.Vec3 1 1 1
   ke = 16
+
+-- |Assembles a texture pipeline for coloring the diffuse component of a
+-- phong model
+mkPhongTexture :: Radiance
+               -> (Vect.Vec3 -> Vect.Vec3)
+               -> (Vect.Vec3 -> (Float, Float))
+               -> ((Float, Float) -> Scene.ColorF)
+               -> IlluminationModel
+mkPhongTexture ambient toObjSpace projFn valTf
+  = Texture $ (plasticMat ambient).valTf.projFn.toObjSpace
 
 -- |Container for vectors necessary during illumination
 data Intersect = Intersect
@@ -69,6 +83,9 @@ illuminate (Phong kaLa kd ks ke) isect lights =
   specular lighti = (color lighti) &* (((reflect lighti) &. view) ** ke)
   view = (Vect.mkNormal).(Vect.neg).(Vect.fromNormal) $ incoming isect
   reflect lighti = Vect.reflect' (normal isect) (source lighti)
+
+illuminate (Texture pipeline) isect lights
+  = illuminate (pipeline (point isect)) isect lights
 
 -- |Pair between a material (IlluminationModel) and a primitive Object
 data LitObject = LitObject IlluminationModel Scene.Object
