@@ -26,7 +26,7 @@ mkCamera eyepoint lookat up = transMap
     u = up &^ n
     v = n &^ u
     proj = compileProj u v n eyepoint
-    transMap = (flip Scene.mapTransform) (Scene.transform proj)
+    transMap = (flip Scene.mapTransform) proj
     --transMap (Scene.ListScene bg os) = Scene.ListScene bg (
     --  map (Scene.transform proj) os)
 

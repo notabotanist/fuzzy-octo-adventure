@@ -21,9 +21,9 @@ data Light
     }
 
 -- |Transforms a light with an object transformer
-_tfLight :: (Scene.Object -> Scene.Object) -> Light -> Light
-_tfLight tf (Point loc col) = (Point loc' col) where
-  loc' = Scene.center $ tf $ (Scene.Sphere loc 0)
+_tfLight :: Vect.Proj4 -> Light -> Light
+_tfLight mat (Point loc col) = (Point loc' col) where
+  loc' = Scene._tfPoint mat loc
 
 -- |Data container for illumination models
 data IlluminationModel
@@ -91,8 +91,8 @@ illuminate (Texture pipeline) isect lights
 data LitObject = LitObject IlluminationModel Scene.Object
 
 -- |Transforms the underlying Object of a LitObject
-_tfLitObject :: (Scene.Object -> Scene.Object) -> LitObject -> LitObject
-_tfLitObject f (LitObject im o) = LitObject im (f o)
+_tfLitObject :: Vect.Proj4 -> LitObject -> LitObject
+_tfLitObject mat (LitObject im o) = LitObject im (Scene.transform mat o)
 
 -- |Extended intersect function to maintain illumination model
 intersect :: Geom.Ray -> LitObject -> Maybe (IlluminationModel,
@@ -138,9 +138,9 @@ litTrace (LitScene background obs lis) ray = case intersections of
     dist light = Vect.len ((location light) &- (point idata))
 
 -- |Maps a transformation over all objects and lights
-litMapTrans :: LitScene -> (Scene.Object -> Scene.Object) -> LitScene
-litMapTrans (LitScene bg obs lis) f
-  = LitScene bg (map (_tfLitObject f) obs) (map (_tfLight f) lis)
+litMapTrans :: LitScene -> Vect.Proj4 -> LitScene
+litMapTrans (LitScene bg obs lis) mat
+  = LitScene bg (map (_tfLitObject mat) obs) (map (_tfLight mat) lis)
 
 -- |Makes an "instance" of Scene from LitScene
 toScene :: LitScene -> Scene.Scene
