@@ -55,8 +55,12 @@ makeFloorQuad o e = [t1, t2] where
 myScene :: Light.LitScene
 myScene = Light.LitScene bgColor objects lights where
   objects = floor ++ [metal, clear]
-  floor = map (Light.LitObject (plastic (1,0,0)))
+  floor = map (Light.LitObject floorTex)
               (makeFloorQuad (Vect.Vec3 7 0 (-7)) 13)
+  floorTex = Light.transformTexture floorTf
+               (Light.mkPhongTexture ambient id planar (checkerboard (1/13)))
+  floorTf = Vect.translateAfter4 (Vect.Vec3 7 0 (-7))
+          $ Vect.scalingUniformProj4 13
   metal = Light.LitObject (plastic (0.8, 0.8, 0.8))
                           (Scene.Sphere (Vect.Vec3 4 3 (-4)) 3)
   clear = Light.LitObject (plastic (0, 1, 0))

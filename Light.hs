@@ -56,6 +56,18 @@ mkPhongTexture :: Radiance
 mkPhongTexture ambient toObjSpace projFn valTf
   = Texture $ (plasticMat ambient).valTf.projFn.toObjSpace
 
+-- |Prepends the inverse of the specified transformation to the texture's
+-- pipeline.  It nastily calculates the forward transformation matrix to then
+-- be inverted.
+transformTexture :: Vect.Proj4 -> IlluminationModel
+  -> IlluminationModel
+transformTexture mat (Texture pipe) = Texture $ pipe.invTf
+  where
+    invTf = Scene._tfPoint matInv
+    matInv = Vect.inverse mat
+-- Fallthrough case
+transformTexture _ im = im
+
 -- |Container for vectors necessary during illumination
 data Intersect = Intersect
   { point      :: Geom.Point
@@ -92,6 +104,8 @@ data LitObject = LitObject IlluminationModel Scene.Object
 
 -- |Transforms the underlying Object of a LitObject
 _tfLitObject :: Vect.Proj4 -> LitObject -> LitObject
+_tfLitObject mat (LitObject t@(Texture _) o) =
+  LitObject (transformTexture mat t) (Scene.transform mat o)
 _tfLitObject mat (LitObject im o) = LitObject im (Scene.transform mat o)
 
 -- |Extended intersect function to maintain illumination model
