@@ -108,16 +108,17 @@ _tfLitObject mat (LitObject t@(Texture _) o) =
   LitObject (transformTexture mat t) (Scene.transform mat o)
 _tfLitObject mat (LitObject im o) = LitObject im (Scene.transform mat o)
 
+-- |Extended intersection type synonym
+type ExIsect = (IlluminationModel, Scene.Intersection)
+
 -- |Extended intersect function to maintain illumination model
-intersect :: Geom.Ray -> LitObject -> Maybe (IlluminationModel,
-                                             Scene.Intersection)
+intersect :: Geom.Ray -> LitObject -> Maybe ExIsect
 intersect ray (LitObject im o) = case Scene.intersect ray o of
   Just i  -> Just (im, i)
   Nothing -> Nothing
 
 -- |Comparison function for extended intersections
-compareExIsects :: (IlluminationModel, Scene.Intersection) ->
-                   (IlluminationModel, Scene.Intersection) -> Ordering
+compareExIsects :: ExIsect -> ExIsect -> Ordering
 compareExIsects (_, a) (_, b) = Scene.compareIntersections a b
 
 -- |Data container for lit scenes
