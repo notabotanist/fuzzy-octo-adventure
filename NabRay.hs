@@ -10,8 +10,8 @@ import qualified Codec.PPM.Binary as PPM
 import Data.Word (Word8)
 
 -- |Default background color
-bgColor :: Scene.ColorF
-bgColor = (0, 0, 1)
+bgColor :: Light.Radiance
+bgColor = Vect.Vec3 0 0 1
 
 -- |Ambient light
 ambient :: Light.Radiance
@@ -96,10 +96,6 @@ myImgProp = Camera.RasterProp 500 325
 myRays :: [Geom.Ray]
 myRays = Camera.rays 1 1.776462 1.154701 myImgProp
 
--- |Performs the raytrace to obtain a list of color values at each pixel
-doTrace :: [Scene.ColorF]
-doTrace = map (Scene.trace (myCamera (Light.toScene myScene))) myRays
-
 -- |Tone Reproduction functions operate on the buffer of collected radiances
 type ToneReproduce = [Scene.ColorF] -> [(Word8, Word8, Word8)]
 
@@ -124,7 +120,7 @@ linearTone rads = map colorFToWords scaled where
   maxB = maximum bs
 
 createImage :: String -> IO ()
-createImage = createImage' (Light.toScene myScene) myCamera
+createImage = createImage' (Light.toScene 1 myScene) myCamera
 
 -- |Renders a specified scene with specified camera, then writes to file
 createImage' :: Scene.Scene -> Camera.Camera -> String -> IO ()
@@ -137,4 +133,4 @@ createImage' scene cam fname = PPM.writePPM fname (Camera.toPair myImgProp) dat
 main :: IO ()
 main = do
   createImage "test.ppm"
-  createImage' (Light.toScene extraScene) myCamera "cylinderTest.ppm"
+  createImage' (Light.toScene 1 extraScene) myCamera "cylinderTest.ppm"

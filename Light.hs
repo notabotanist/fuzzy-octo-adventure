@@ -129,7 +129,7 @@ compareExIsects :: ExIsect -> ExIsect -> Ordering
 compareExIsects (_, _, a) (_, _, b) = Scene.compareIntersections a b
 
 -- |Data container for lit scenes
-data LitScene = LitScene Scene.ColorF [LitObject] [Light]
+data LitScene = LitScene Radiance [LitObject] [Light]
 
 -- |Adds a LitObject to a LitScene
 insertLitObj :: LitObject -> LitScene -> LitScene
@@ -140,14 +140,16 @@ insertLight :: Light -> LitScene -> LitScene
 insertLight l (LitScene bg os ls) = LitScene bg os (l:ls)
 
 -- |Returns a triple of floats that are actually radiance values, not <= 1
-litTrace :: LitScene -> Geom.Ray -> Scene.ColorF
-litTrace (LitScene background obs lis) ray = case intersections of
+-- Recurses until depth parameter <= 0
+litTrace :: Int -> LitScene -> Geom.Ray -> Radiance
+litTrace depth scene@(LitScene background obs lis) ray = case intersections of
   [] -> background
   ns -> shadePoint (minimumBy compareExIsects ns)
   where
   intersections = mapMaybe (intersect ray) obs
-  toColorF (Vect.Vec3 r g b) = (r, g, b)
-  shadePoint (lo, im, isect) = toColorF $ illuminate im idata directLights where
+  shadePoint (lo, im, isect)
+    = local &+ reflection &+ transmission where
+    local = illuminate im idata directLights
     idata = mkIntersect isect ray
     directLights = filter visible lis
     visible light = case mapMaybe (intersect (shadow light)) obs of
@@ -159,12 +161,23 @@ litTrace (LitScene background obs lis) ray = case intersections of
     shadowPoint = (point idata) &+
       (0.001 `Vect.scalarMul` (Vect.fromNormal (normal idata)))
     dist light = Vect.len ((location light) &- (point idata))
+    transmission = Vect.Vec3 0 0 0 -- Later
+    reflection
+      | depth > 0 && (kr lo) > 0 = (kr lo) `Vect.scalarMul`
+                                     litTrace (pred depth) scene flectray
+      | otherwise = Vect.Vec3 0 0 0
+    flectray = Geom.Ray shadowPoint
+                        (Vect.reflect' (normal idata) srcdir)
+    srcdir = normNeg (Geom.direction ray)
+    normNeg = (Vect.mkNormal).(Vect.neg).(Vect.fromNormal)
 
 -- |Maps a transformation over all objects and lights
 litMapTrans :: LitScene -> Vect.Proj4 -> LitScene
 litMapTrans (LitScene bg obs lis) mat
   = LitScene bg (map (_tfLitObject mat) obs) (map (_tfLight mat) lis)
 
--- |Makes an "instance" of Scene from LitScene
-toScene :: LitScene -> Scene.Scene
-toScene lit = Scene.Scene (litTrace lit) (toScene.litMapTrans lit)
+toColorF (Vect.Vec3 r g b) = (r, g, b)
+
+-- |Makes an "instance" of Scene from LitScene with a given max depth
+toScene :: Int -> LitScene -> Scene.Scene
+toScene d lit = Scene.Scene (toColorF.(litTrace d lit)) ((toScene d).litMapTrans lit)
