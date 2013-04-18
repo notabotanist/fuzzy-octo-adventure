@@ -71,7 +71,7 @@ myScene = Light.LitScene bgColor objects lights where
 -- |Adds a cylinder extra to myScene
 extraScene :: Light.LitScene
 extraScene = Light.insertLitObj cyl myScene where
-  cyl = Light.LitObject 0 0 (Light.plasticMat ambient (1, 1, 0))
+  cyl = Light.LitObject 0.8 0 (Light.plasticMat ambient (1, 1, 0))
     (Scene.Cylinder (Vect.Vec3 4 2 1) (Vect.mkNormal (Vect.Vec3 0 1 0)) 1 2)
 
 -- |Adds a light extra to myScene
