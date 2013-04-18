@@ -116,17 +116,17 @@ _tfLitObject mat (LitObject kr kt im o)
   = LitObject kr kt im (Scene.transform mat o)
 
 -- |Extended intersection type synonym
-type ExIsect = (IlluminationModel, Scene.Intersection)
+type ExIsect = (LitObject, IlluminationModel, Scene.Intersection)
 
 -- |Extended intersect function to maintain illumination model
 intersect :: Geom.Ray -> LitObject -> Maybe ExIsect
-intersect ray (LitObject kr kt im o) = case Scene.intersect ray o of
-  Just i  -> Just (im, i)
+intersect ray targ@(LitObject kr kt im o) = case Scene.intersect ray o of
+  Just i  -> Just (targ, im, i)
   Nothing -> Nothing
 
 -- |Comparison function for extended intersections
 compareExIsects :: ExIsect -> ExIsect -> Ordering
-compareExIsects (_, a) (_, b) = Scene.compareIntersections a b
+compareExIsects (_, _, a) (_, _, b) = Scene.compareIntersections a b
 
 -- |Data container for lit scenes
 data LitScene = LitScene Scene.ColorF [LitObject] [Light]
@@ -147,12 +147,13 @@ litTrace (LitScene background obs lis) ray = case intersections of
   where
   intersections = mapMaybe (intersect ray) obs
   toColorF (Vect.Vec3 r g b) = (r, g, b)
-  shadePoint (im, isect) = toColorF $ illuminate im idata directLights where
+  shadePoint (lo, im, isect) = toColorF $ illuminate im idata directLights where
     idata = mkIntersect isect ray
     directLights = filter visible lis
     visible light = case mapMaybe (intersect (shadow light)) obs of
       [] -> True
-      ns -> let (_, (_,t,_)) = minimumBy compareExIsects ns in (dist light) < t
+      ns -> (dist light) < (closestT ns)
+    closestT = (\(_, _, (_,t,_)) -> t).(minimumBy compareExIsects)
     shadow light = Geom.Ray shadowPoint
                             (Vect.mkNormal ((location light) &- (point idata)))
     shadowPoint = (point idata) &+
