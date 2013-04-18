@@ -100,20 +100,27 @@ illuminate (Texture pipeline) isect lights
   = illuminate (pipeline (point isect)) isect lights
 
 -- |Pair between a material (IlluminationModel) and a primitive Object
-data LitObject = LitObject IlluminationModel Scene.Object
+data LitObject = LitObject Float Float IlluminationModel Scene.Object
+
+-- |Reflectiveness constant
+kr (LitObject f _ _ _) = f
+
+-- |Transmissiveness constant
+kt (LitObject _ f _ _) = f
 
 -- |Transforms the underlying Object of a LitObject
 _tfLitObject :: Vect.Proj4 -> LitObject -> LitObject
-_tfLitObject mat (LitObject t@(Texture _) o) =
-  LitObject (transformTexture mat t) (Scene.transform mat o)
-_tfLitObject mat (LitObject im o) = LitObject im (Scene.transform mat o)
+_tfLitObject mat (LitObject kr kt t@(Texture _) o)
+  = LitObject kr kt (transformTexture mat t) (Scene.transform mat o)
+_tfLitObject mat (LitObject kr kt im o)
+  = LitObject kr kt im (Scene.transform mat o)
 
 -- |Extended intersection type synonym
 type ExIsect = (IlluminationModel, Scene.Intersection)
 
 -- |Extended intersect function to maintain illumination model
 intersect :: Geom.Ray -> LitObject -> Maybe ExIsect
-intersect ray (LitObject im o) = case Scene.intersect ray o of
+intersect ray (LitObject kr kt im o) = case Scene.intersect ray o of
   Just i  -> Just (im, i)
   Nothing -> Nothing
 
