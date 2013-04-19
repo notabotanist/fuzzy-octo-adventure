@@ -73,14 +73,21 @@ data Intersect = Intersect
   { point      :: Geom.Point
   , normal     :: Vect.Normal3
   , incoming   :: Vect.Normal3
+  , model      :: IlluminationModel
   }
 
 -- |Creates Intersect object from Scene.Intersection and traced ray
-mkIntersect :: Scene.Intersection -> Geom.Ray -> Intersect
+mkIntersect :: Scene.Intersection -> Geom.Ray -> IlluminationModel -> Intersect
 mkIntersect (_, t, norm) r@(Geom.Ray _ dir)
   = Intersect (Geom.eval r t)
     norm
     dir
+
+-- |Generates a point a small distance from the intersection point along
+-- the normal direction; resolves rounding errors from calculating t
+epsilonPoint :: Intersect -> Geom.Point
+epsilonPoint idata = (point idata) &+
+  (0.001 `Vect.scalarMul` (Vect.fromNormal (normal idata)))
 
 -- |Perform illumination with the given model, calculating the radiance
 -- along the returning ray (opposite the incoming ray)
@@ -129,7 +136,7 @@ compareExIsects :: ExIsect -> ExIsect -> Ordering
 compareExIsects (_, _, a) (_, _, b) = Scene.compareIntersections a b
 
 -- |Data container for lit scenes
-data LitScene = LitScene Scene.ColorF [LitObject] [Light]
+data LitScene = LitScene Radiance [LitObject] [Light]
 
 -- |Adds a LitObject to a LitScene
 insertLitObj :: LitObject -> LitScene -> LitScene
@@ -142,13 +149,13 @@ insertLight l (LitScene bg os ls) = LitScene bg os (l:ls)
 -- |Returns a triple of floats that are actually radiance values, not <= 1
 litTrace :: LitScene -> Geom.Ray -> Scene.ColorF
 litTrace (LitScene background obs lis) ray = case intersections of
-  [] -> background
+  [] -> toColorF background
   ns -> shadePoint (minimumBy compareExIsects ns)
   where
   intersections = mapMaybe (intersect ray) obs
   toColorF (Vect.Vec3 r g b) = (r, g, b)
   shadePoint (lo, im, isect) = toColorF $ illuminate im idata directLights where
-    idata = mkIntersect isect ray
+    idata = mkIntersect isect ray im
     directLights = filter visible lis
     visible light = case mapMaybe (intersect (shadow light)) obs of
       [] -> True
@@ -159,6 +166,46 @@ litTrace (LitScene background obs lis) ray = case intersections of
     shadowPoint = (point idata) &+
       (0.001 `Vect.scalarMul` (Vect.fromNormal (normal idata)))
     dist light = Vect.len ((location light) &- (point idata))
+
+type AndPower a = (Float, a)
+
+-- |Traces a ray into a litscene, producing intersection data and a list of
+-- rays for further tracing, including reflection and transmission rays
+perfectStep :: LitScene -> AndPower Geom.Ray ->
+               (AndPower (Maybe Intersect), [AndPower Geom.Ray])
+perfectStep (LitScene _ obs _) (k, ray) = ((k, midata), (newrays isect)) where
+  isect = case anyIntersections of
+    [] -> Nothing
+    ns -> Just (minimumBy compareExIsects ns)
+  anyIntersections = mapMaybe (intersect ray) obs
+  formIdata ((LitObject _ _ im _), _, si) = mkIntersect si ray im
+  midata = fmap formIdata isect
+  newrays Nothing = []
+  newrays (Just (lo, _, sceneIsect)) = reflectRays ++ transmissionRays where
+    idata = mkIntersect sceneIsect ray im
+    (LitObject _ _ im _) = lo
+    reflectRays
+      | (kr lo) > 0 = [ (k*(kr lo), Geom.Ray surfaceEpsilon reflectDirection) ]
+      | otherwise   = []
+    transmissionRays = [] -- For now
+    surfaceEpsilon = (point idata) &+
+      (0.001 `Vect.scalarMul` (Vect.fromNormal (normal idata)))
+    reflectDirection = (Vect.mkNormal).(Vect.neg).(Vect.fromNormal) $
+                       (Geom.direction ray)
+
+-- |Performs local illumination on an individual set of intersect data
+localIlluminate :: LitScene -> Maybe Intersect -> Radiance
+localIlluminate (LitScene bg _ _) Nothing = bg
+localIlluminate (LitScene _ obs lis) (Just idata)
+  = illuminate (model idata) idata directLights where
+  directLights = filter visible lis
+  visible light = case mapMaybe (intersect (shadow light)) obs of
+    [] -> True
+    ns -> (dist light) < (closestT ns)
+  closestT = (\(_, _, (_,t,_)) -> t).(minimumBy compareExIsects)
+  shadow light = Geom.Ray (epsilonPoint idata)
+                          (Vect.mkNormal ((location light) &- (point idata)))
+  dist light = Vect.len ((location light) &- (point idata))
 
 -- |Maps a transformation over all objects and lights
 litMapTrans :: LitScene -> Vect.Proj4 -> LitScene
