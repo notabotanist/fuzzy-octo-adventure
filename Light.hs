@@ -6,6 +6,7 @@ import qualified Geom
 import qualified Scene
 import Data.Maybe (mapMaybe)
 import Data.List (minimumBy)
+import Data.Tree (Tree(..), unfoldTree)
 
 -- |Type alias for radiance in 3 frequencies: (r,g,b)
 type Radiance = Vect.Vec3
@@ -206,6 +207,12 @@ localIlluminate (LitScene _ obs lis) (Just idata)
   shadow light = Geom.Ray (epsilonPoint idata)
                           (Vect.mkNormal ((location light) &- (point idata)))
   dist light = Vect.len ((location light) &- (point idata))
+
+-- |Limits a tree to a given depth.  Stops at 1.
+depthLimit :: Int -> Tree a -> Tree a
+depthLimit n (Node v vs)
+  | n > 1     = Node v (map (depthLimit (pred n)) vs)
+  | otherwise = Node v []
 
 -- |Maps a transformation over all objects and lights
 litMapTrans :: LitScene -> Vect.Proj4 -> LitScene
