@@ -7,6 +7,8 @@ import qualified Scene
 import Data.Maybe (mapMaybe)
 import Data.List (minimumBy)
 import Data.Tree (Tree(..), unfoldTree)
+import Data.Monoid (Monoid(..))
+import Data.Foldable (foldMap)
 
 -- |Type alias for radiance in 3 frequencies: (r,g,b)
 type Radiance = Vect.Vec3
@@ -147,27 +149,6 @@ insertLitObj o (LitScene bg os ls) = LitScene bg (o:os) ls
 insertLight :: Light -> LitScene -> LitScene
 insertLight l (LitScene bg os ls) = LitScene bg os (l:ls)
 
--- |Returns a triple of floats that are actually radiance values, not <= 1
-litTrace :: LitScene -> Geom.Ray -> Scene.ColorF
-litTrace (LitScene background obs lis) ray = case intersections of
-  [] -> toColorF background
-  ns -> shadePoint (minimumBy compareExIsects ns)
-  where
-  intersections = mapMaybe (intersect ray) obs
-  toColorF (Vect.Vec3 r g b) = (r, g, b)
-  shadePoint (lo, im, isect) = toColorF $ illuminate im idata directLights where
-    idata = mkIntersect isect ray im
-    directLights = filter visible lis
-    visible light = case mapMaybe (intersect (shadow light)) obs of
-      [] -> True
-      ns -> (dist light) < (closestT ns)
-    closestT = (\(_, _, (_,t,_)) -> t).(minimumBy compareExIsects)
-    shadow light = Geom.Ray shadowPoint
-                            (Vect.mkNormal ((location light) &- (point idata)))
-    shadowPoint = (point idata) &+
-      (0.001 `Vect.scalarMul` (Vect.fromNormal (normal idata)))
-    dist light = Vect.len ((location light) &- (point idata))
-
 type AndPower a = (Float, a)
 
 -- |Traces a ray into a litscene, producing intersection data and a list of
@@ -191,8 +172,9 @@ perfectStep (LitScene _ obs _) (k, ray) = ((k, midata), (newrays isect)) where
     transmissionRays = [] -- For now
     surfaceEpsilon = (point idata) &+
       (0.001 `Vect.scalarMul` (Vect.fromNormal (normal idata)))
-    reflectDirection = (Vect.mkNormal).(Vect.neg).(Vect.fromNormal) $
-                       (Geom.direction ray)
+    reflectDirection = Vect.reflect' (normal idata) srcDir
+    srcDir = (Vect.mkNormal).(Vect.neg).(Vect.fromNormal) $
+             (Geom.direction ray)
 
 -- |Performs local illumination on an individual set of intersect data
 localIlluminate :: LitScene -> Maybe Intersect -> Radiance
@@ -214,6 +196,21 @@ depthLimit n (Node v vs)
   | n > 1     = Node v (map (depthLimit (pred n)) vs)
   | otherwise = Node v []
 
+-- |For the tree folding magic, Vect.Vec3 must be a Monoid
+instance Monoid Vect.Vec3 where
+  mempty = Vect.zero
+  mappend = (&+)
+
+-- |Traces a ray into a scene, bouncing up to the given number of times.
+-- Calculates the final radiance traveling along that ray to the eye
+litTrace :: Int -> LitScene -> Geom.Ray -> Radiance
+litTrace maxd scene ray = collapse.(depthLimit maxd).build $ (1, ray) where
+  build = unfoldTree (perfectStep scene)
+  collapse = foldMap powerLocal
+  powerLocal (k, mi) = k `Vect.scalarMul` (localIlluminate scene mi)
+
+toColorF (Vect.Vec3 r g b) = (r, g, b)
+
 -- |Maps a transformation over all objects and lights
 litMapTrans :: LitScene -> Vect.Proj4 -> LitScene
 litMapTrans (LitScene bg obs lis) mat
@@ -221,4 +218,4 @@ litMapTrans (LitScene bg obs lis) mat
 
 -- |Makes an "instance" of Scene from LitScene
 toScene :: LitScene -> Scene.Scene
-toScene lit = Scene.Scene (litTrace lit) (toScene.litMapTrans lit)
+toScene lit = Scene.Scene (toColorF.litTrace 5 lit) (toScene.litMapTrans lit)

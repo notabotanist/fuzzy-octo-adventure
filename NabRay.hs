@@ -10,8 +10,8 @@ import qualified Codec.PPM.Binary as PPM
 import Data.Word (Word8)
 
 -- |Default background color
-bgColor :: Scene.ColorF
-bgColor = (0, 0, 1)
+bgColor :: Light.Radiance
+bgColor = Vect.Vec3 0 0 1
 
 -- |Ambient light
 ambient :: Light.Radiance
@@ -55,7 +55,7 @@ makeFloorQuad o e = [t1, t2] where
 myScene :: Light.LitScene
 myScene = Light.LitScene bgColor objects lights where
   objects = floor ++ [metal, clear]
-  floor = map (Light.LitObject 0 0 floorTex)
+  floor = map (Light.LitObject 0.5 0 floorTex)
               (makeFloorQuad (Vect.Vec3 7 0 (-7)) 13)
   floorTex = Light.transformTexture floorTf
                (Light.mkPhongTexture ambient id planar (checkerboard (1/13)))
