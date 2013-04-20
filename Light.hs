@@ -6,6 +6,9 @@ import qualified Geom
 import qualified Scene
 import Data.Maybe (mapMaybe)
 import Data.List (minimumBy)
+import Data.Tree (Tree(..), unfoldTree)
+import Data.Monoid (Monoid(..))
+import Data.Foldable (foldMap)
 
 -- |Type alias for radiance in 3 frequencies: (r,g,b)
 type Radiance = Vect.Vec3
@@ -73,14 +76,21 @@ data Intersect = Intersect
   { point      :: Geom.Point
   , normal     :: Vect.Normal3
   , incoming   :: Vect.Normal3
+  , model      :: IlluminationModel
   }
 
 -- |Creates Intersect object from Scene.Intersection and traced ray
-mkIntersect :: Scene.Intersection -> Geom.Ray -> Intersect
+mkIntersect :: Scene.Intersection -> Geom.Ray -> IlluminationModel -> Intersect
 mkIntersect (_, t, norm) r@(Geom.Ray _ dir)
   = Intersect (Geom.eval r t)
     norm
     dir
+
+-- |Generates a point a small distance from the intersection point along
+-- the normal direction; resolves rounding errors from calculating t
+epsilonPoint :: Intersect -> Geom.Point
+epsilonPoint idata = (point idata) &+
+  (0.001 `Vect.scalarMul` (Vect.fromNormal (normal idata)))
 
 -- |Perform illumination with the given model, calculating the radiance
 -- along the returning ray (opposite the incoming ray)
@@ -139,37 +149,65 @@ insertLitObj o (LitScene bg os ls) = LitScene bg (o:os) ls
 insertLight :: Light -> LitScene -> LitScene
 insertLight l (LitScene bg os ls) = LitScene bg os (l:ls)
 
--- |Returns a triple of floats that are actually radiance values, not <= 1
--- Recurses until depth parameter <= 0
-litTrace :: Int -> LitScene -> Geom.Ray -> Radiance
-litTrace depth scene@(LitScene background obs lis) ray = case intersections of
-  [] -> background
-  ns -> shadePoint (minimumBy compareExIsects ns)
-  where
-  intersections = mapMaybe (intersect ray) obs
-  shadePoint (lo, im, isect)
-    = local &+ reflection &+ transmission where
-    local = illuminate im idata directLights
-    idata = mkIntersect isect ray
-    directLights = filter visible lis
-    visible light = case mapMaybe (intersect (shadow light)) obs of
-      [] -> True
-      ns -> (dist light) < (closestT ns)
-    closestT = (\(_, _, (_,t,_)) -> t).(minimumBy compareExIsects)
-    shadow light = Geom.Ray shadowPoint
-                            (Vect.mkNormal ((location light) &- (point idata)))
-    shadowPoint = (point idata) &+
+type AndPower a = (Float, a)
+
+-- |Traces a ray into a litscene, producing intersection data and a list of
+-- rays for further tracing, including reflection and transmission rays
+perfectStep :: LitScene -> AndPower Geom.Ray ->
+               (AndPower (Maybe Intersect), [AndPower Geom.Ray])
+perfectStep (LitScene _ obs _) (k, ray) = ((k, midata), (newrays isect)) where
+  isect = case anyIntersections of
+    [] -> Nothing
+    ns -> Just (minimumBy compareExIsects ns)
+  anyIntersections = mapMaybe (intersect ray) obs
+  formIdata ((LitObject _ _ im _), _, si) = mkIntersect si ray im
+  midata = fmap formIdata isect
+  newrays Nothing = []
+  newrays (Just (lo, _, sceneIsect)) = reflectRays ++ transmissionRays where
+    idata = mkIntersect sceneIsect ray im
+    (LitObject _ _ im _) = lo
+    reflectRays
+      | (kr lo) > 0 = [ (k*(kr lo), Geom.Ray surfaceEpsilon reflectDirection) ]
+      | otherwise   = []
+    transmissionRays = [] -- For now
+    surfaceEpsilon = (point idata) &+
       (0.001 `Vect.scalarMul` (Vect.fromNormal (normal idata)))
-    dist light = Vect.len ((location light) &- (point idata))
-    transmission = Vect.Vec3 0 0 0 -- Later
-    reflection
-      | depth > 0 && (kr lo) > 0 = (kr lo) `Vect.scalarMul`
-                                     litTrace (pred depth) scene flectray
-      | otherwise = Vect.Vec3 0 0 0
-    flectray = Geom.Ray shadowPoint
-                        (Vect.reflect' (normal idata) srcdir)
-    srcdir = normNeg (Geom.direction ray)
-    normNeg = (Vect.mkNormal).(Vect.neg).(Vect.fromNormal)
+    reflectDirection = Vect.reflect' (normal idata) srcDir
+    srcDir = (Vect.mkNormal).(Vect.neg).(Vect.fromNormal) $
+             (Geom.direction ray)
+
+-- |Performs local illumination on an individual set of intersect data
+localIlluminate :: LitScene -> Maybe Intersect -> Radiance
+localIlluminate (LitScene bg _ _) Nothing = bg
+localIlluminate (LitScene _ obs lis) (Just idata)
+  = illuminate (model idata) idata directLights where
+  directLights = filter visible lis
+  visible light = case mapMaybe (intersect (shadow light)) obs of
+    [] -> True
+    ns -> (dist light) < (closestT ns)
+  closestT = (\(_, _, (_,t,_)) -> t).(minimumBy compareExIsects)
+  shadow light = Geom.Ray (epsilonPoint idata)
+                          (Vect.mkNormal ((location light) &- (point idata)))
+  dist light = Vect.len ((location light) &- (point idata))
+
+-- |Limits a tree to a given depth.  Stops at 1.
+depthLimit :: Int -> Tree a -> Tree a
+depthLimit n (Node v vs)
+  | n > 1     = Node v (map (depthLimit (pred n)) vs)
+  | otherwise = Node v []
+
+-- |For the tree folding magic, Vect.Vec3 must be a Monoid
+instance Monoid Vect.Vec3 where
+  mempty = Vect.zero
+  mappend = (&+)
+
+-- |Traces a ray into a scene, bouncing up to the given number of times.
+-- Calculates the final radiance traveling along that ray to the eye
+litTrace :: Int -> LitScene -> Geom.Ray -> Radiance
+litTrace maxd scene ray = collapse.(depthLimit maxd).build $ (1, ray) where
+  build = unfoldTree (perfectStep scene)
+  collapse = foldMap powerLocal
+  powerLocal (k, mi) = k `Vect.scalarMul` (localIlluminate scene mi)
 
 -- |Maps a transformation over all objects and lights
 litMapTrans :: LitScene -> Vect.Proj4 -> LitScene
@@ -181,3 +219,4 @@ toColorF (Vect.Vec3 r g b) = (r, g, b)
 -- |Makes an "instance" of Scene from LitScene with a given max depth
 toScene :: Int -> LitScene -> Scene.Scene
 toScene d lit = Scene.Scene (toColorF.(litTrace d lit)) ((toScene d).litMapTrans lit)
+
