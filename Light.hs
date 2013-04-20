@@ -6,9 +6,13 @@ import qualified Geom
 import qualified Scene
 import Data.Maybe (mapMaybe)
 import Data.List (minimumBy)
-import Data.Tree (Tree(..), unfoldTree)
+import Data.Tree (Tree(..), unfoldTree, unfoldTreeM_BF)
 import Data.Monoid (Monoid(..))
 import Data.Foldable (foldMap)
+import Control.Monad.State (State, state, evalState)
+import Control.Monad (liftM)
+import System.Random (StdGen)
+import Control.Applicative ((<$>),(<*>))
 
 -- |Type alias for radiance in 3 frequencies: (r,g,b)
 type Radiance = Vect.Vec3
@@ -170,8 +174,38 @@ perfectStep (LitScene _ obs _) (k, ray) = ((k, midata), (newrays isect)) where
       | (kr lo) > 0 = [ (k*(kr lo), Geom.Ray surfaceEpsilon reflectDirection) ]
       | otherwise   = []
     transmissionRays = [] -- For now
-    surfaceEpsilon = (point idata) &+
-      (0.001 `Vect.scalarMul` (Vect.fromNormal (normal idata)))
+    surfaceEpsilon = (epsilonPoint idata)
+    reflectDirection = Vect.reflect' (normal idata) srcDir
+    srcDir = (Vect.mkNormal).(Vect.neg).(Vect.fromNormal) $
+             (Geom.direction ray)
+
+-- |Traces a ray into a litscene, producing multiple randomly sampled reflection
+-- rays in a cone from the intersection point.
+multiReflectStep :: Int -> Float -> LitScene -> AndPower Geom.Ray ->
+  State StdGen (AndPower (Maybe Intersect), [AndPower Geom.Ray])
+multiReflectStep coneRays coneSize (LitScene _ obs _) (k, ray) =
+  do seeds <- newrays isect
+     return ((k, midata), seeds) where
+  isect = case anyIntersections of
+    [] -> Nothing
+    ns -> Just (minimumBy compareExIsects ns)
+  anyIntersections = mapMaybe (intersect ray) obs
+  formIdata ((LitObject _ _ im _), _, si) = mkIntersect si ray im
+  midata = fmap formIdata isect
+  newrays Nothing = return []
+  newrays (Just (lo, _, sceneIsect)) = (++) <$> reflectRays <*> transmissionRays where
+    idata = mkIntersect sceneIsect ray im
+    (LitObject _ _ im _) = lo
+    reflectRays
+      | (kr lo) > 0 = mapM (reflectRay) [1..coneRays]
+--      | (kr lo) > 0 = [ (k*(kr lo), Geom.Ray surfaceEpsilon reflectDirection) ]
+      | otherwise   = return []
+    reflectRay _ = do
+      dir <- state (Geom.randomCone reflectDirection coneSize)
+      return (k*(kr lo)/(fromIntegral coneRays),
+              Geom.Ray surfaceEpsilon dir)
+    transmissionRays = return [] -- For now
+    surfaceEpsilon = epsilonPoint idata
     reflectDirection = Vect.reflect' (normal idata) srcDir
     srcDir = (Vect.mkNormal).(Vect.neg).(Vect.fromNormal) $
              (Geom.direction ray)
@@ -209,6 +243,18 @@ litTrace maxd scene ray = collapse.(depthLimit maxd).build $ (1, ray) where
   collapse = foldMap powerLocal
   powerLocal (k, mi) = k `Vect.scalarMul` (localIlluminate scene mi)
 
+-- |Traces a ray into a scene, bouncing a given number of times.
+-- Reflections produce a number of rays within a cone of given angle width.
+-- They are distributed randomly according to the provided RandomGen
+litTraceCone :: Int -> Int -> Float -> StdGen -> LitScene -> Geom.Ray -> Radiance
+litTraceCone maxd coneRays coneAngle gen scene ray =
+  collapse.build $ (1, ray) where
+  build = ((flip evalState) gen).
+    (liftM (depthLimit maxd)).
+    unfoldTreeM_BF (multiReflectStep coneRays coneAngle scene)
+  collapse = foldMap powerLocal
+  powerLocal (k, mi) = k `Vect.scalarMul` (localIlluminate scene mi)
+
 toColorF (Vect.Vec3 r g b) = (r, g, b)
 
 -- |Maps a transformation over all objects and lights
@@ -219,3 +265,9 @@ litMapTrans (LitScene bg obs lis) mat
 -- |Makes an "instance" of Scene from LitScene
 toScene :: LitScene -> Scene.Scene
 toScene lit = Scene.Scene (toColorF.litTrace 5 lit) (toScene.litMapTrans lit)
+
+-- |Makes an "instance" of Scene from LitScene using multiple reflection rays
+multiReflectScene :: Int -> Float -> StdGen -> LitScene -> Scene.Scene
+multiReflectScene coneRays coneAngle gen lit =
+  Scene.Scene (toColorF.litTraceCone 2 coneRays coneAngle gen lit)
+              (multiReflectScene coneRays coneAngle gen.litMapTrans lit)

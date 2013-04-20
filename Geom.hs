@@ -4,10 +4,12 @@ module Geom
   , Ray(..)
   , complementBasis
   , eval
+  , randomCone
   ) where
 
-import Data.Vect (Vec3, Normal3)
+import Data.Vect (Vec3, Normal3, (&.))
 import qualified Data.Vect as Vect
+import System.Random (RandomGen, randomR)
 
 type Point = Vec3
 
@@ -46,3 +48,18 @@ complementBasis nW
       vX = wY * uZ - wZ * uY
       vY = (-wX) * uZ
       vZ = wX * uY
+
+-- |Creates a unit vector randomly distributed within a cone
+randomCone :: RandomGen g => Vect.Normal3 -> Float -> g -> (Vect.Normal3, g)
+randomCone coneAxis theta gen =
+  let (z  ,gen1) = randomR (cos theta,1) gen
+      (phi,gen2) = randomR (0,2*pi) gen1
+      hypot = sqrt (1 - z * z)
+      localVec = Vect.Vec3 (hypot * cos phi) (hypot * sin phi) z
+  in ((Vect.mkNormal.alignPole) localVec, gen2) where
+  alignPole vec
+    | (Vect._2.Vect.fromNormal) coneAxis ==   1  = vec
+    | (Vect._2.Vect.fromNormal) coneAxis == (-1) = Vect.neg vec
+    | otherwise = Vect.rotate3 alignRot alignAxis vec where
+      alignAxis = Vect.crossprod (Vect.fromNormal coneAxis) (Vect.Vec3 0 0 1)
+      alignRot = acos ((Vect.fromNormal coneAxis) &. (Vect.Vec3 0 0 1))
