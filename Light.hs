@@ -199,15 +199,17 @@ perfectStep (LitScene _ obs _) (k, ray) = ((k, midata), (newrays isect)) where
 localIlluminate :: LitScene -> Maybe Intersect -> Radiance
 localIlluminate (LitScene bg _ _) Nothing = bg
 localIlluminate (LitScene _ obs lis) (Just idata)
-  = illuminate (model idata) idata directLights where
-  directLights = filter visible lis
-  visible light = case mapMaybe (intersect (shadow light)) obs of
-    [] -> True
-    ns -> (dist light) < (closestT ns)
-  closestT = (\(_, _, (_,t,_)) -> t).(minimumBy compareExIsects)
+  = illuminate (model idata) idata transmittedLights where
+  transmittedLights = filter direct $ map allTransReduce lis
+  allTransReduce light = foldl transReduce light $
+    filter (between light) $ mapMaybe (intersect (shadow light)) obs
+  transReduce (Point loc col) (lo, _, _) = Point loc (col &* (kt lo))
+  between light (_, _, (_,t,_)) = t < dist light
   shadow light = Geom.Ray (epsilonPoint idata)
                           (Vect.mkNormal ((location light) &- (point idata)))
   dist light = Vect.len ((location light) &- (point idata))
+  direct light = srcDir &. (normal idata) > 0 where
+    srcDir = Vect.mkNormal ((location light) &- (point idata))
 
 -- |Limits a tree to a given depth.  Stops at 1.
 depthLimit :: Int -> Tree a -> Tree a
