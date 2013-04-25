@@ -55,15 +55,15 @@ makeFloorQuad o e = [t1, t2] where
 myScene :: Light.LitScene
 myScene = Light.LitScene bgColor objects lights where
   objects = floor ++ [metal, clear]
-  floor = map (Light.LitObject 0 0 floorTex)
+  floor = map (Light.LitObject 0 0 0 floorTex)
               (makeFloorQuad (Vect.Vec3 7 0 (-7)) 13)
   floorTex = Light.transformTexture floorTf
                (Light.mkPhongTexture ambient id planar (checkerboard (1/13)))
   floorTf = Vect.translateAfter4 (Vect.Vec3 7 0 (-7))
           $ Vect.scalingUniformProj4 13
-  metal = Light.LitObject 0.8 0 (plastic (0.2, 0.2, 0.2))
+  metal = Light.LitObject 0.8 0 0 (plastic (0.2, 0.2, 0.2))
                           (Scene.Sphere (Vect.Vec3 4 3 (-4)) 3)
-  clear = Light.LitObject 0 0 (plastic (0, 1, 0))
+  clear = Light.LitObject 0 0.8 0.95 (plastic (0.2, 0.2, 0.2))
                           (Scene.Sphere (Vect.Vec3 0 5 0) 3)
   plastic = Light.plasticMat ambient
   lights = [(Light.Point (Vect.Vec3 (-1) 22 3) (Vect.Vec3 1 1 1))]
@@ -71,7 +71,7 @@ myScene = Light.LitScene bgColor objects lights where
 -- |Adds a cylinder extra to myScene
 extraScene :: Light.LitScene
 extraScene = Light.insertLitObj cyl myScene where
-  cyl = Light.LitObject 0.2 0 (Light.plasticMat ambient (0.8, 0.8, 0))
+  cyl = Light.LitObject 0.2 0 0 (Light.plasticMat ambient (0.8, 0.8, 0))
     (Scene.Cylinder (Vect.Vec3 4 2 1) (Vect.mkNormal (Vect.Vec3 0 1 0)) 1 2)
 
 -- |Adds a light extra to myScene

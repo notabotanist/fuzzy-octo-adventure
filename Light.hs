@@ -110,27 +110,30 @@ illuminate (Texture pipeline) isect lights
   = illuminate (pipeline (point isect)) isect lights
 
 -- |Pair between a material (IlluminationModel) and a primitive Object
-data LitObject = LitObject Float Float IlluminationModel Scene.Object
+data LitObject = LitObject Float Float Float IlluminationModel Scene.Object
 
 -- |Reflectiveness constant
-kr (LitObject f _ _ _) = f
+kr (LitObject f _ _ _ _) = f
 
 -- |Transmissiveness constant
-kt (LitObject _ f _ _) = f
+kt (LitObject _ f _ _ _) = f
+
+-- |Index of refraction
+eta (LitObject _ _ f _ _) = f
 
 -- |Transforms the underlying Object of a LitObject
 _tfLitObject :: Vect.Proj4 -> LitObject -> LitObject
-_tfLitObject mat (LitObject kr kt t@(Texture _) o)
-  = LitObject kr kt (transformTexture mat t) (Scene.transform mat o)
-_tfLitObject mat (LitObject kr kt im o)
-  = LitObject kr kt im (Scene.transform mat o)
+_tfLitObject mat (LitObject kr kt n t@(Texture _) o)
+  = LitObject kr kt n (transformTexture mat t) (Scene.transform mat o)
+_tfLitObject mat (LitObject kr kt n im o)
+  = LitObject kr kt n im (Scene.transform mat o)
 
 -- |Extended intersection type synonym
 type ExIsect = (LitObject, IlluminationModel, Scene.Intersection)
 
 -- |Extended intersect function to maintain illumination model
 intersect :: Geom.Ray -> LitObject -> Maybe ExIsect
-intersect ray targ@(LitObject kr kt im o) = case Scene.intersect ray o of
+intersect ray targ@(LitObject kr kt n im o) = case Scene.intersect ray o of
   Just i  -> Just (targ, im, i)
   Nothing -> Nothing
 
@@ -160,21 +163,37 @@ perfectStep (LitScene _ obs _) (k, ray) = ((k, midata), (newrays isect)) where
     [] -> Nothing
     ns -> Just (minimumBy compareExIsects ns)
   anyIntersections = mapMaybe (intersect ray) obs
-  formIdata ((LitObject _ _ im _), _, si) = mkIntersect si ray im
+  formIdata ((LitObject _ _ _ im _), _, si) = mkIntersect si ray im
   midata = fmap formIdata isect
   newrays Nothing = []
   newrays (Just (lo, _, sceneIsect)) = reflectRays ++ transmissionRays where
     idata = mkIntersect sceneIsect ray im
-    (LitObject _ _ im _) = lo
+    (LitObject _ _ _ im _) = lo
     reflectRays
       | (kr lo) > 0 = [ (k*(kr lo), Geom.Ray surfaceEpsilon reflectDirection) ]
       | otherwise   = []
-    transmissionRays = [] -- For now
+    transmissionRays
+      | (kt lo) > 0 = [ (k*(kt lo), Geom.Ray subsurfaceEpsilon transDirection)]
+      | otherwise   = []
     surfaceEpsilon = (point idata) &+
       (0.001 `Vect.scalarMul` (Vect.fromNormal (normal idata)))
-    reflectDirection = Vect.reflect' (normal idata) srcDir
+    subsurfaceEpsilon = (point idata) &+
+      (Vect.fromNormalRadius (-0.001) transNorm)
     srcDir = (Vect.mkNormal).(Vect.neg).(Vect.fromNormal) $
              (Geom.direction ray)
+    reflectDirection = Vect.reflect' (normal idata) srcDir
+    transNorm
+      | srcDir &. (normal idata) < 0 = Vect.flipNormal (normal idata)
+      | otherwise = normal idata
+    transDirection
+      | srcDir &. (normal idata) < 0 =
+        Vect.refract' (eta lo)
+                      (Vect.flipNormal (normal idata))
+                      srcDir
+      | otherwise =
+        Vect.refract' (1.0/(eta lo))
+                      (normal idata)
+                      srcDir
 
 -- |Performs local illumination on an individual set of intersect data
 localIlluminate :: LitScene -> Maybe Intersect -> Radiance
