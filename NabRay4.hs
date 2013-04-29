@@ -12,6 +12,9 @@ import Data.Word (Word8)
 checkSphere :: Vect.Vec3 -> Bool
 checkSphere (Vect.Vec3 x y z) = x * x + y * y + z * z < 1
 
+colorSphere :: Vect.Vec3 -> Scene.ColorF
+colorSphere (Vect.Vec3 x y z) = (abs x, abs y, abs z)
+
 myTransform :: Geom4.Transform
 myTransform = Geom4.Transform rot (Vect.Vec4 0 0 (-3) 0) where
   rot = rotMatrix4 (pi / 4) (vec4X, vec4Y)
@@ -19,7 +22,7 @@ myTransform = Geom4.Transform rot (Vect.Vec4 0 0 (-3) 0) where
 
 myScene :: Scene4.Scene
 myScene = Scene4.Scene (0,0,1) [obj] where
-  sphere = Scene4.Embed Scene4.basicHyperPlane checkSphere (\_ -> (1, 0, 0))
+  sphere = Scene4.Embed Scene4.basicHyperPlane checkSphere colorSphere
   obj = Scene4.transform myTransform sphere
 
 -- |Renders a specified scene with specified camera, then writes to file

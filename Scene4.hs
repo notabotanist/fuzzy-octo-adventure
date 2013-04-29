@@ -27,6 +27,14 @@ basicHyperPlane = HyperPlane (Vect.Vec4 0 0 0 0)
                              (Vect.mkNormal (Vect.Vec4 0 0 1 0))
                              (Vect.mkNormal (Vect.Vec4 0 0 0 1))
 
+-- |Project a 4d point into the hyperplane
+project :: HyperPlane -> Vect.Vec4 -> Vect.Vec3
+project (HyperPlane r i j k vN) p = Vect.Vec3 px py pz where
+  p' = p &- r
+  px = p' &. Vect.fromNormal i
+  py = p' &. Vect.fromNormal j
+  pz = p' &. Vect.fromNormal k
+
 -- |data type of 4d objects which can be intersected by rays
 data Object4
   -- |We can embed 3d objects in a 4d space by specifying a hyperplane in
@@ -37,8 +45,9 @@ data Object4
     (Vect.Vec3 -> Bool)   -- ^ Intersection function
     (Vect.Vec3 -> ColorF) -- ^ Shading function
 
-objColor :: Object4 -> ColorF
-objColor (Embed _ _ f) = f (Vect.Vec3 0 0 0)
+-- |shades an object based on the intersection point
+objColor :: Object4 -> Vect.Vec4 -> ColorF
+objColor (Embed hp _ f) = f.project hp
 
 type Intersection = (Object4, Float)
 
@@ -76,7 +85,7 @@ data Scene = Scene ColorF [Object4]
 trace :: Scene -> Geom4.Ray -> ColorF
 trace (Scene bg os) ray = case intersections of
   [] -> bg
-  ns -> let (o, _) = head ns in objColor o
+  ns -> let (o, t) = head ns in objColor o (Geom4.eval ray t)
   where
   intersections = mapMaybe (intersect ray) os
 
