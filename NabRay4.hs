@@ -14,7 +14,7 @@ checkSphere (Vect.Vec3 x y z) = x * x + y * y + z * z < 1
 
 myTransform :: Geom4.Transform
 myTransform = Geom4.Transform rot (Vect.Vec4 0 0 (-3) 0) where
-  rot = rotMatrix4 (pi / 4) (vec4X, vec4Z)
+  rot = rotMatrix4 (pi / 4) (vec4X, vec4Y)
 --  rot = Vect.idmtx
 
 myScene :: Scene4.Scene

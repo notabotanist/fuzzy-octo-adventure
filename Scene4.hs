@@ -52,8 +52,8 @@ intersect (Geom4.Ray p0 v) o@(Embed hp isContained _)
   where
   (HyperPlane r i j k vN) = hp
   div = vN &. v
-  t = -((Vect.fromNormal vN &. p0) + sE) / div
-  sE = Vect.fromNormal vN &. r -- I think??
+  t = -((Vect.fromNormal vN &. p0) - sE) / div
+  sE = Vect.fromNormal vN &. r
   p' = Vect.Vec3 px py pz
   preIsect = (p0 &- r &+ (t `Vect.scalarMul` Vect.fromNormal v))
   px = preIsect &. Vect.fromNormal i
