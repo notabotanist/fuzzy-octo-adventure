@@ -15,10 +15,17 @@ checkSphere (Vect.Vec3 x y z) = x * x + y * y + z * z < 1
 colorSphere :: Vect.Vec3 -> Scene.ColorF
 colorSphere (Vect.Vec3 x y z) = (abs x, abs y, abs z)
 
+makeTransform :: Float -> Geom4.Transform
+makeTransform phi = Geom4.Transform rot (Vect.Vec4 0 0 (-3) 0) where
+  rot = rotMatrix4 phi (vec4X, vec4Y)
+
 myTransform :: Geom4.Transform
-myTransform = Geom4.Transform rot (Vect.Vec4 0 0 (-3) 0) where
-  rot = rotMatrix4 (pi / 4) (vec4X, vec4Y)
---  rot = Vect.idmtx
+myTransform = makeTransform (pi / 4)
+
+makeScene :: Float -> Scene4.Scene
+makeScene phi = Scene4.Scene (0,0,1) [obj] where
+  sphere = Scene4.Embed Scene4.basicHyperPlane checkSphere colorSphere
+  obj = Scene4.transform (makeTransform phi) sphere
 
 myScene :: Scene4.Scene
 myScene = Scene4.Scene (0,0,1) [obj] where
@@ -30,6 +37,12 @@ createImage' :: Scene4.Scene -> String -> IO ()
 createImage' scene fname = PPM.writePPM fname (Camera.toPair myImgProp) dat
   where
     dat = constTone (map (Scene4.trace scene) myRays)
+
+-- |Renders the scene using the given angle to construct its transformation
+createImageAngle :: Float -> IO ()
+createImageAngle phi = createImage' scene name where
+  scene = makeScene phi
+  name = "4d-" ++ (take 4 $ show phi) ++ ".ppm"
 
 -- |Tone Reproduction functions operate on the buffer of collected radiances
 type ToneReproduce = [Scene.ColorF] -> [(Word8, Word8, Word8)]
