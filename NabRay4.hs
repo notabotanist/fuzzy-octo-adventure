@@ -16,8 +16,10 @@ colorSphere :: Vect.Vec3 -> Scene.ColorF
 colorSphere (Vect.Vec3 x y z) = (abs x, abs y, abs z)
 
 makeTransform :: Float -> Geom4.Transform
-makeTransform phi = Geom4.Transform rot (Vect.Vec4 0 0 (-3) 0) where
-  rot = rotMatrix4 phi (vec4X, vec4Y)
+makeTransform phi = Geom4.tfSeq tR tS where
+  tS = Geom4.Transform rotS (Vect.Vec4 0 0 (-3) 0)
+  rotS = rotMatrix4 (pi / 4) (vec4X, vec4Y)
+  tR = Geom4.Transform (rotMatrix4 phi (vec4X, vec4W)) Vect.zero
 
 myTransform :: Geom4.Transform
 myTransform = makeTransform (pi / 4)
