@@ -100,7 +100,7 @@ intersect (Geom4.Ray p0 v) o@(HyperSphere c r)
   sB = 2 * (p0' &. (Vect.fromNormal v))
   sC = p0' &. p0' - r * r
   discrim = sB * sB - 4 * sC
-  calcT op = (-sB `op` sqrt discrim) / 2
+  calcT op = ((-sB) `op` sqrt discrim) / 2
   nearT = foldl findMin Nothing .filter (>0).map calcT $ [(+),(-)]
   findMin Nothing t = Just t
   findMin (Just a) b = Just (min a b)

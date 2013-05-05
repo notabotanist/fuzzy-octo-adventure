@@ -34,6 +34,11 @@ myScene = Scene4.Scene (0,0,1) [obj] where
   sphere = Scene4.Embed Scene4.basicHyperPlane checkSphere colorSphere
   obj = Scene4.transform myTransform sphere
 
+hyperScene :: Scene4.Scene
+hyperScene = Scene4.Scene (0,0,1) [obj] where
+  obj = sphere
+  sphere = Scene4.HyperSphere (Vect.Vec4 0 0 (-3) (-0.5)) 1
+
 -- |Renders a specified scene with specified camera, then writes to file
 createImage' :: Scene4.Scene -> String -> IO ()
 createImage' scene fname = PPM.writePPM fname (Camera.toPair myImgProp) dat
