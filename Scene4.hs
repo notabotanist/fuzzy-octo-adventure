@@ -6,6 +6,7 @@ import qualified Data.Vect as Vect
 import Scene (ColorF)
 import Camera (RasterProp(..))
 import Data.Maybe (mapMaybe)
+import Control.Applicative ((<$>),(<*>),pure)
 
 -- |Data type for hyperplanes of dimension 3
 data HyperPlane = HyperPlane
@@ -44,10 +45,32 @@ data Object4
     HyperPlane            -- ^ Containing hyperplane
     (Vect.Vec3 -> Bool)   -- ^ Intersection function
     (Vect.Vec3 -> ColorF) -- ^ Shading function
+  -- |Standard hypersphere
+  | HyperSphere
+    { center :: Vect.Vec4
+    , radius :: Float
+    }
+
+-- |Colors an object based on the w coordinate of its intersection point,
+-- where the intersection point is given in object coordinates [-1,1]
+-- Scales from Red to Green
+wColor :: Vect.Vec4 -> ColorF
+wColor (Vect.Vec4 _ _ _ w) =
+  let red = Vect.Vec3 1 0 0
+      green = Vect.Vec3 0 1 0
+      t = (w + 1) / 2
+  in toTuple $ Vect.interpolate t red green where
+  toTuple (Vect.Vec3 x y z) = (x, y, z)
 
 -- |shades an object based on the intersection point
 objColor :: Object4 -> Vect.Vec4 -> ColorF
 objColor (Embed hp _ f) = f.project hp
+objColor obj = wColor.toObjectCoords obj
+
+-- |Transforms a 4d point to object space
+toObjectCoords :: Object4 -> Vect.Vec4 -> Vect.Vec4
+toObjectCoords (Embed hp _ _) = Vect.extendZero.project hp
+toObjectCoords (HyperSphere c r) = Vect.scalarMul (1/r).(&- c)
 
 type Intersection = (Object4, Float)
 
@@ -68,6 +91,19 @@ intersect (Geom4.Ray p0 v) o@(Embed hp isContained _)
   px = preIsect &. Vect.fromNormal i
   py = preIsect &. Vect.fromNormal j
   pz = preIsect &. Vect.fromNormal k
+-- Hypersphere case
+intersect (Geom4.Ray p0 v) o@(HyperSphere c r)
+  | discrim < 0 = Nothing
+  | otherwise = (,) <$> pure o <*> nearT
+  where
+  p0' = p0 &- c
+  sB = 2 * (p0' &. (Vect.fromNormal v))
+  sC = p0' &. p0' - r * r
+  discrim = sB * sB - 4 * sC
+  calcT op = (-sB `op` sqrt discrim) / 2
+  nearT = foldl findMin Nothing .filter (>0).map calcT $ [(+),(-)]
+  findMin Nothing t = Just t
+  findMin (Just a) b = Just (min a b)
 
 transform :: Geom4.Transform -> Object4 -> Object4
 transform (Geom4.Transform rot trans) (Embed hp f g) = Embed hp' f g where
@@ -79,6 +115,8 @@ transform (Geom4.Transform rot trans) (Embed hp f g) = Embed hp' f g where
   j' = axisRot j
   k' = axisRot k
   vN' = axisRot vN
+transform (Geom4.Transform rot trans) (HyperSphere c r) = HyperSphere c' r where
+  c' = (Vect.rmul c rot) &+ trans
 
 data Scene = Scene ColorF [Object4]
 
