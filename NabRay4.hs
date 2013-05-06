@@ -25,12 +25,12 @@ myTransform :: Geom4.Transform
 myTransform = makeTransform (pi / 4)
 
 makeScene :: Float -> Scene4.Scene
-makeScene phi = Scene4.Scene (0,0,1) [obj] where
+makeScene phi = Scene4.Scene (1,1,1) [obj] where
   sphere = Scene4.Embed Scene4.basicHyperPlane checkSphere colorSphere
   obj = Scene4.transform (makeTransform phi) sphere
 
 myScene :: Scene4.Scene
-myScene = Scene4.Scene (0,0,1) [obj] where
+myScene = Scene4.Scene (1,1,1) [obj] where
   sphere = Scene4.Embed Scene4.basicHyperPlane checkSphere colorSphere
   obj = Scene4.transform myTransform sphere
 
