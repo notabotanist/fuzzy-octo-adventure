@@ -11,7 +11,7 @@ type ToneReproduce = [Scene.ColorF] -> [(Word8, Word8, Word8)]
 
 -- |Maximum output luminance of target device
 targetLdmax :: Float
-targetLdmax = 3
+targetLdmax = 300
 
 -- |Quick and dirty approximation to pixel illuminance given R,G,B
 pixIllum :: Scene.ColorF -> Illuminance
@@ -22,9 +22,10 @@ colorMap :: (Float -> Float) -> Scene.ColorF -> Scene.ColorF
 colorMap f (r, g, b) = (f r, f g, f b)
 
 -- |Scales an rgb color triple from [0,1] to [0,255]
+-- If the triple value is greater than 1, clamps to 1.
 colorFToWords :: Scene.ColorF -> (Word8, Word8, Word8)
 colorFToWords (r, g, b) = (s r, s g, s b) where
-  s = truncate.(*255)
+  s = truncate.(*255).(min 1)
 
 -- |Device model for a simple actual device with a maximum output of ldmax
 -- and a gamma of 1 with standard sRGB color space.

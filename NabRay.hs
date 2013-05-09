@@ -6,6 +6,7 @@ import qualified Scene
 import qualified Geom
 import qualified Camera
 import qualified Light
+import qualified Tone
 import qualified Codec.PPM.Binary as PPM
 import Data.Word (Word8)
 
@@ -79,6 +80,14 @@ extraLight :: Light.LitScene
 extraLight = Light.insertLight red myScene where
   red = Light.Point (Vect.Vec3 (-5) 1 0) (Vect.Vec3 1.5 0 0)
 
+-- |Scales all light sources in a scene by a factor
+scaleLights :: Float -> Light.LitScene -> Light.LitScene
+scaleLights factor (Light.LitScene bg obs lights)
+  = Light.LitScene (Vect.scalarMul factor bg) obs
+                   (map (scaleLight factor) lights) where
+  scaleLight f (Light.Point loc color)
+    = Light.Point loc (Vect.scalarMul f color)
+
 -- |Creates the camera transformation according to previously found values
 myCamera :: Camera.Camera
 myCamera = Camera.mkCamera (Vect.Vec3 0 5 9.4)
@@ -96,22 +105,14 @@ myImgProp = Camera.RasterProp 500 325
 myRays :: [Geom.Ray]
 myRays = Camera.rays 1 1.776462 1.154701 myImgProp
 
--- |Tone Reproduction functions operate on the buffer of collected radiances
-type ToneReproduce = [Scene.ColorF] -> [(Word8, Word8, Word8)]
-
--- |Scales an rgb color triple from [0,1] to [0,255]
-colorFToWords :: Scene.ColorF -> (Word8, Word8, Word8)
-colorFToWords (r, g, b) = (s r, s g, s b) where
-  s = truncate.(*255)
-
 -- |This one simply scales all values to 255
-constTone :: ToneReproduce
-constTone = map colorFToWords
+constTone :: Tone.ToneReproduce
+constTone = map Tone.colorFToWords
 
 -- |Scales collected irradiances linearly based on the maximum irradiance
 -- values collected
-linearTone :: ToneReproduce
-linearTone rads = map colorFToWords scaled where
+linearTone :: Tone.ToneReproduce
+linearTone rads = map Tone.colorFToWords scaled where
   scaled = map (scale (1/maxR) (1/maxG) (1/maxB)) rads
   scale rf gf bf (r, g, b) = (rf * r, gf * g, bf * b)
   (rs, gs, bs) = unzip3 rads
@@ -124,9 +125,15 @@ createImage = createImage' (Light.toScene 1 myScene) myCamera
 
 -- |Renders a specified scene with specified camera, then writes to file
 createImage' :: Scene.Scene -> Camera.Camera -> String -> IO ()
-createImage' scene cam fname = PPM.writePPM fname (Camera.toPair myImgProp) dat
+createImage' = createImageTR linearTone
+
+-- |Renders a scene with the given tone reproduction operator
+createImageTR :: Tone.ToneReproduce -> Scene.Scene -> Camera.Camera -> String
+                 -> IO ()
+createImageTR tr scene cam fname
+  = PPM.writePPM fname (Camera.toPair myImgProp) dat
   where
-    dat = linearTone (map (Scene.trace (cam scene)) myRays)
+    dat = tr (map (Scene.trace (cam scene)) myRays)
 
 -- |Performs two renders: first the standard to "test.ppm", then the extra
 -- with cylinder to "cylinderTest.ppm"
