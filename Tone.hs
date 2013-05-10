@@ -44,6 +44,8 @@ logAvg :: Float -> [Float] -> Float
 logAvg delta ls = exp ((recip sN) * (sum.map (log.(delta+)) $ ls)) where
   sN = fromIntegral $ length ls
 
+-- |Generates a tone reproduction operator for Ward's model given a
+-- target ldmax
 wardTR :: Illuminance -> ToneReproduce
 wardTR ldmax radiances = map ((colorFToWords).
                               (simpleDevice ldmax).
@@ -51,3 +53,18 @@ wardTR ldmax radiances = map ((colorFToWords).
   where
   sf = wardScaleFactor ldmax lwa
   lwa = logAvg 0.01 (map pixIllum radiances)
+
+-- |Generates a tone reproduction operator for Reinhard's model given
+-- only a target ldmax, using the default zone (V -- a=0.18)
+reinhardTR :: Illuminance -> ToneReproduce
+reinhardTR = (flip reinhardTR') 0.18
+
+-- |Generates a tone reproduction operator for Reinhard's model given
+-- a target ldmax and a zone constant
+reinhardTR' :: Illuminance -> Float -> ToneReproduce
+reinhardTR' ldmax a radiances
+  = map ((colorFToWords).(simpleDevice ldmax).(reinhard key a)) radiances
+  where
+  key = logAvg 0.01 (map pixIllum radiances)
+  reinhard key a = colorMap ((*ldmax).filmresponse.(*(a/key)))
+  filmresponse v = v / (1+v)
