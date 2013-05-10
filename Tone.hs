@@ -57,14 +57,15 @@ wardTR ldmax radiances = map ((colorFToWords).
 -- |Generates a tone reproduction operator for Reinhard's model given
 -- only a target ldmax, using the default zone (V -- a=0.18)
 reinhardTR :: Illuminance -> ToneReproduce
-reinhardTR = (flip reinhardTR') 0.18
+reinhardTR = reinhardTR' 0.18 (logAvg 0.01)
 
 -- |Generates a tone reproduction operator for Reinhard's model given
--- a target ldmax and a zone constant
-reinhardTR' :: Illuminance -> Float -> ToneReproduce
-reinhardTR' ldmax a radiances
+-- a zone constant, a key function, and a target ldmax
+reinhardTR' :: Float -> ([Illuminance] -> Illuminance) -> Illuminance
+               -> ToneReproduce
+reinhardTR' a keyfunc ldmax radiances
   = map ((colorFToWords).(simpleDevice ldmax).(reinhard key a)) radiances
   where
-  key = logAvg 0.01 (map pixIllum radiances)
+  key = keyfunc (map pixIllum radiances)
   reinhard key a = colorMap ((*ldmax).filmresponse.(*(a/key)))
   filmresponse v = v / (1+v)
