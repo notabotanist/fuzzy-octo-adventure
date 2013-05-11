@@ -91,10 +91,8 @@ scaleLights factor (Light.LitScene bg obs lights)
 -- |Creates the camera transformation according to previously found values
 myCamera :: Camera.Camera
 myCamera = Camera.mkCamera (Vect.Vec3 0 5 9.4)
---          (Vect.mkNormal (Vect.Vec3 0 (-0.166769) (-0.98599604)))
                            (Vect.Vec3 0 4.833231 8.414004)
             (Vect.mkNormal (Vect.Vec3 0 1 0))
---myCamera = Camera.transCam (Vect.Vec3 0 5 9.4)
 
 -- |The produced image properties (500,325)
 myImgProp :: Camera.RasterProp
@@ -121,7 +119,7 @@ linearTone rads = map Tone.colorFToWords scaled where
   maxB = maximum bs
 
 createImage :: String -> IO ()
-createImage = createImage' (Light.toScene 1 myScene) myCamera
+createImage = createImage' (Light.toScene 7 myScene) myCamera
 
 -- |Renders a specified scene with specified camera, then writes to file
 createImage' :: Scene.Scene -> Camera.Camera -> String -> IO ()
@@ -135,9 +133,18 @@ createImageTR tr scene cam fname
   where
     dat = tr (map (Scene.trace (cam scene)) myRays)
 
--- |Performs two renders: first the standard to "test.ppm", then the extra
--- with cylinder to "cylinderTest.ppm"
+-- |6 renders: 3 for each tone reproduction operator, according to checkpoint7
 main :: IO ()
 main = do
-  createImage "test.ppm"
-  createImage' (Light.toScene 1 extraScene) myCamera "cylinderTest.ppm"
+  sequence_ [do putStrLn ("ward "++sx)
+                (createImageTR (Tone.wardTR Tone.targetLdmax)
+                               (Light.toScene 7 (scaleLights x myScene))
+                               myCamera
+                               ("ward "++sx++".ppm"))
+             | x <- [1,1000,10000] :: [Float], let sx = (show.truncate) x ]
+  sequence_ [do putStrLn ("reinhard "++sx)
+                (createImageTR (Tone.reinhardTR Tone.targetLdmax)
+                               (Light.toScene 7 (scaleLights x myScene))
+                               myCamera
+                               ("reinhard "++sx++".ppm"))
+             | x <- [1,1000,10000] :: [Float], let sx = (show.truncate) x ]
