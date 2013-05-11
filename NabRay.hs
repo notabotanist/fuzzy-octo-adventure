@@ -1,4 +1,4 @@
-module NabRay where
+module Main where
 
 import Data.Vect ((&-),(&+))
 import qualified Data.Vect as Vect
