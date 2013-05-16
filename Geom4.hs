@@ -6,6 +6,8 @@ module Geom4
   , Transform(..)
   , tfIdentity
   , tfSeq
+  , reflect
+  , reflect'
   ) where
 
 import Data.Vect (Vec4, Normal4)
@@ -33,3 +35,12 @@ tfSeq (Transform mR a) (Transform mS b) =
   let rot = mR Vect..*. mS
       tra = (a `Vect.rmul` mS) Vect.&+ b
   in Transform rot tra
+
+-- |Reflects a vector to an axis
+reflect :: Normal4 -> Vec4 -> Vec4
+reflect u v = (s `Vect.scalarMul` n) Vect.&- v where
+  n = Vect.fromNormal u
+  s = 2 * (n Vect.&. v)
+
+reflect' :: Normal4 -> Normal4 -> Normal4
+reflect' u x = Vect.toNormalUnsafe $ reflect u (Vect.fromNormal x)
