@@ -7,6 +7,7 @@ import Scene (ColorF)
 import Camera (RasterProp(..))
 import Data.Maybe (mapMaybe)
 import Control.Applicative ((<$>),(<*>),pure)
+import Data.List (minimumBy)
 
 -- |Data type for hyperplanes of dimension 3
 data HyperPlane = HyperPlane
@@ -74,6 +75,10 @@ toObjectCoords (HyperSphere c r) = Vect.scalarMul (1/r).(&- c)
 
 type Intersection = (Object4, Float, Vect.Normal4)
 
+-- |Compare intersections by omega values
+compareIntersections :: Intersection -> Intersection -> Ordering
+compareIntersections (_, a, _) (_, b, _) = compare a b
+
 intersect :: Geom4.Ray -> Object4 -> Maybe Intersection
 -- Embedded 3d object case
 intersect (Geom4.Ray p0 v) o@(Embed hp isContained _)
@@ -124,9 +129,10 @@ data Scene = Scene ColorF [Object4]
 trace :: Scene -> Geom4.Ray -> ColorF
 trace (Scene bg os) ray = case intersections of
   [] -> bg
-  ns -> let (o, t, _) = head ns in objColor o (Geom4.eval ray t)
+  ns -> let (o, t, _) = nearest ns in objColor o (Geom4.eval ray t)
   where
   intersections = mapMaybe (intersect ray) os
+  nearest = minimumBy compareIntersections
 
 -- |Generates a list of rays to trace (in camera space) given some rendering
 -- properties
