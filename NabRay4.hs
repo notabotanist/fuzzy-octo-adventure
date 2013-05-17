@@ -25,6 +25,9 @@ bgColor = Vect.Vec3 0 0 1
 ambient :: Light.Radiance
 ambient = Vect.Vec3 0.2 0.2 0.2
 
+myTexture :: Scene4.Object4 -> Light4.IlluminationModel
+myTexture obj = Light4.mkTexture ambient (Scene4.objColor obj)
+
 makeTransform :: Float -> Geom4.Transform
 makeTransform phi = Geom4.tfSeq tR tS where
   tS = Geom4.Transform rotS (Vect.Vec4 0 0 (-3) 0.25)
@@ -41,7 +44,7 @@ makeScene :: Float -> Light4.LitScene4
 makeScene phi = Light4.LitScene4 (Vect.Vec3 1 1 1) [lobj] [myLight] where
   sphere = Scene4.Embed Scene4.basicHyperPlane checkSphere colorSphere
   obj = Scene4.transform (makeTransform phi) sphere
-  lobj = Light4.LitObject4 (Light.plasticMat ambient (0, 0, 1)) obj
+  lobj = Light4.LitObject4 (myTexture obj) obj
 
 myScene :: Scene4.Scene
 myScene = Scene4.Scene (1,1,1) [obj] where
@@ -49,10 +52,10 @@ myScene = Scene4.Scene (1,1,1) [obj] where
   obj = Scene4.transform myTransform sphere
 
 hyperScene :: Float -> Light4.LitScene4
-hyperScene w = Light4.LitScene4 (Vect.Vec3 0 0 1) [lobj] [myLight] where
+hyperScene w = Light4.LitScene4 (Vect.Vec3 1 1 1) [lobj] [myLight] where
   obj = sphere
   sphere = Scene4.HyperSphere (Vect.Vec4 0 0 (-3) w) 1
-  lobj = Light4.LitObject4 (Light.plasticMat ambient (0, 0.8, 0)) obj
+  lobj = Light4.LitObject4 (myTexture obj) obj
 
 -- |Renders a specified scene with specified camera, then writes to file
 createImage' :: Scene4.Scene -> String -> IO ()

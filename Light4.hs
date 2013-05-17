@@ -2,7 +2,7 @@ module Light4 where
 
 import Data.Vect ((&+),(&-),(&!),(&*),(&.))
 import qualified Data.Vect as Vect
-import Light (IlluminationModel(..),Radiance(..),plasticMat)
+import Light (Coefficients,Radiance(..))
 import qualified Light
 import qualified Geom4
 import qualified Scene (ColorF)
@@ -30,6 +30,32 @@ mkIntersect (_, t, norm) r@(Geom4.Ray _ dir)
     norm
     dir
 
+-- |Data container for illumination models
+data IlluminationModel
+  -- |Phong model illumination
+  = Phong Radiance     -- ^coefficients of ambient component (ka) baked into
+                       -- ambient light radiance
+          Coefficients -- ^coefficients of diffuse component (kd)
+          Coefficients -- ^coefficients of specular component (ks)
+          Float        -- ^specular exponent (ke)
+  -- |Generic texture-mapping type
+  | Texture
+    -- |Function encapsulating the whole texture mapping pipeline
+    (Vect.Vec4 -> IlluminationModel)
+
+-- |creates a colored plastic-like material
+plasticMat :: Radiance -> Scene.ColorF -> IlluminationModel
+plasticMat ambient (dr, dg, db) = Phong ka kd ks ke where
+  kd = Vect.Vec3 dr dg db
+  ka = ambient &! kd
+  ks = Vect.Vec3 1 1 1
+  ke = 16
+
+-- |Assemble a texture pipelin
+mkTexture :: Radiance -> (Vect.Vec4 -> Scene.ColorF) -> IlluminationModel
+mkTexture ambient colorer
+  = Texture $ (plasticMat ambient).colorer
+
 -- |Perform illumination with the given model, calculating the radiance
 -- along the returning ray (opposite the incoming ray)
 illuminate :: IlluminationModel -> Intersect -> [Light] -> Radiance
@@ -43,6 +69,9 @@ illuminate (Phong kaLa kd ks ke) isect lights =
   specular lighti = (color lighti) &* (((reflect lighti) &. view) ** ke)
   view = (Vect.mkNormal).(Vect.neg).(Vect.fromNormal) $ incoming isect
   reflect lighti = Geom4.reflect' (normal isect) (source lighti)
+
+illuminate (Texture pipeline) isect lights
+  = illuminate (pipeline (point isect)) isect lights
 
 data LitObject4 = LitObject4 IlluminationModel Scene4.Object4
 
