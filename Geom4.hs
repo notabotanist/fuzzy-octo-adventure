@@ -43,4 +43,4 @@ reflect u v = (s `Vect.scalarMul` n) Vect.&- v where
   s = 2 * (n Vect.&. v)
 
 reflect' :: Normal4 -> Normal4 -> Normal4
-reflect' u x = Vect.toNormalUnsafe $ reflect u (Vect.fromNormal x)
+reflect' u x = Vect.mkNormal $ reflect u (Vect.fromNormal x)

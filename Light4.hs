@@ -74,4 +74,11 @@ litTrace (LitScene4 bg obs lis) ray = case intersections of
   intersections = mapMaybe (intersect ray) obs
   shadePoint (im, isect) = illuminate im idata directLights where
     idata = mkIntersect isect ray
-    directLights = lis  -- Shadows ignored
+    directLights = filter visible lis
+    visible light = case mapMaybe (intersect (shadow light)) obs of
+      [] -> True
+      ns -> let (_, (_,t,_)) = minimumBy compareExIsects ns in (dist light) < t
+    shadow light = Geom4.Ray shadowPoint
+                             (Vect.mkNormal ((location light) &- (point idata)))
+    shadowPoint = (point idata) &+ Vect.fromNormalRadius 0.001 (normal idata)
+    dist light = Vect.len ((location light) &- (point idata))
