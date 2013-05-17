@@ -1,4 +1,4 @@
-module NabRay4 where
+module Main where
 
 import qualified Geom4
 import qualified Scene4
@@ -105,3 +105,13 @@ myImgProp = Camera.RasterProp 500 325
 -- They depend on some camera properties.
 myRays :: [Geom4.Ray]
 myRays = Scene4.rays 1 1.776462 1.154701 myImgProp
+
+
+-- |Main function: render a bunch of examples
+main :: IO ()
+main = do
+  sequence_ [createImageAngle (x * pi / 4) | x <- [0..4]]
+  sequence_ [createHyperImage (x / 10) | x <- [-10..10]]
+  where
+  createHyperImage f = createLitImage (hyperScene f) $
+    "hyperSphere w" ++ ((take 3).show $ f) ++ ".ppm"
