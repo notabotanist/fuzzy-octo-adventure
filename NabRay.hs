@@ -17,6 +17,26 @@ bgColor = (0, 0, 1)
 ambient :: Light.Radiance
 ambient = Vect.Vec3 0.2 0.2 0.2
 
+-- |Value transform from texture coords to red or yellow based on checker
+checkerboard :: Float -> (Float, Float) -> Scene.ColorF
+checkerboard checksize (u, v)
+  | rowEven && colEven = red
+  | rowEven && not colEven = yellow
+  | not rowEven && colEven = yellow
+  | not rowEven && not colEven = red
+  where
+    rowEven = (floor (u / checksize)) `mod` 2 == 0 
+    colEven = (floor (v / checksize)) `mod` 2 == 0
+    red = (1, 0, 0)
+    yellow = (1, 1, 0)
+
+-- |Planar projection function, assuming y value constant and x and z within
+-- the range [-1, 1]
+planar :: Vect.Vec3 -> (Float, Float)
+planar (Vect.Vec3 x y z) = (u, v) where
+  u = (x + 1) / 2
+  v = (z + 1) / 2
+
 -- |Creates two Triangles representing a quad
 makeFloorQuad :: Geom.Point -- ^Center point
               -> Float      -- ^Half-width and half-height
@@ -35,8 +55,12 @@ makeFloorQuad o e = [t1, t2] where
 myScene :: Light.LitScene
 myScene = Light.LitScene bgColor objects lights where
   objects = floor ++ [metal, clear]
-  floor = map (Light.LitObject (plastic (1,0,0)))
+  floor = map (Light.LitObject floorTex)
               (makeFloorQuad (Vect.Vec3 7 0 (-7)) 13)
+  floorTex = Light.transformTexture floorTf
+               (Light.mkPhongTexture ambient id planar (checkerboard (1/13)))
+  floorTf = Vect.translateAfter4 (Vect.Vec3 7 0 (-7))
+          $ Vect.scalingUniformProj4 13
   metal = Light.LitObject (plastic (0.8, 0.8, 0.8))
                           (Scene.Sphere (Vect.Vec3 4 3 (-4)) 3)
   clear = Light.LitObject (plastic (0, 1, 0))

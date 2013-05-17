@@ -186,7 +186,7 @@ data Scene = Scene {
   -- |Trace a ray into the scene, producing some color in the image
   trace :: Geom.Ray -> ColorF,
   -- |Map an object transformation across all objects in the scene
-  mapTransform :: (Object -> Object) -> Scene
+  mapTransform :: Vect.Proj4 -> Scene
 }
 
 -- |Implementation of Scene based on a plain list
@@ -207,4 +207,4 @@ toScene s@(ListScene background os) = Scene (lTrace)
     where
       intersections = mapMaybe (intersect ray) os
       closest = minimumBy compareIntersections intersections
-  lMapTrans f = toScene $ ListScene background (map f os)
+  lMapTrans mat = toScene $ ListScene background (map (transform mat) os)

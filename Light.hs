@@ -21,9 +21,9 @@ data Light
     }
 
 -- |Transforms a light with an object transformer
-_tfLight :: (Scene.Object -> Scene.Object) -> Light -> Light
-_tfLight tf (Point loc col) = (Point loc' col) where
-  loc' = Scene.center $ tf $ (Scene.Sphere loc 0)
+_tfLight :: Vect.Proj4 -> Light -> Light
+_tfLight mat (Point loc col) = (Point loc' col) where
+  loc' = Scene._tfPoint mat loc
 
 -- |Data container for illumination models
 data IlluminationModel
@@ -33,6 +33,10 @@ data IlluminationModel
           Coefficients -- ^coefficients of diffuse component (kd)
           Coefficients -- ^coefficients of specular component (ks)
           Float        -- ^specular exponent (ke)
+  -- |Generic texture-mapping type
+  | Texture
+    -- |Function encapsulating the whole texture mapping pipeline
+    (Vect.Vec3 -> IlluminationModel)
 
 -- |creates a colored plastic-like material
 plasticMat :: Radiance -> Scene.ColorF -> IlluminationModel
@@ -41,6 +45,28 @@ plasticMat ambient (dr, dg, db) = Phong ka kd ks ke where
   ka = ambient &! kd
   ks = Vect.Vec3 1 1 1
   ke = 16
+
+-- |Assembles a texture pipeline for coloring the diffuse component of a
+-- phong model
+mkPhongTexture :: Radiance
+               -> (Vect.Vec3 -> Vect.Vec3)
+               -> (Vect.Vec3 -> (Float, Float))
+               -> ((Float, Float) -> Scene.ColorF)
+               -> IlluminationModel
+mkPhongTexture ambient toObjSpace projFn valTf
+  = Texture $ (plasticMat ambient).valTf.projFn.toObjSpace
+
+-- |Prepends the inverse of the specified transformation to the texture's
+-- pipeline.  It nastily calculates the forward transformation matrix to then
+-- be inverted.
+transformTexture :: Vect.Proj4 -> IlluminationModel
+  -> IlluminationModel
+transformTexture mat (Texture pipe) = Texture $ pipe.invTf
+  where
+    invTf = Scene._tfPoint matInv
+    matInv = Vect.inverse mat
+-- Fallthrough case
+transformTexture _ im = im
 
 -- |Container for vectors necessary during illumination
 data Intersect = Intersect
@@ -70,12 +96,17 @@ illuminate (Phong kaLa kd ks ke) isect lights =
   view = (Vect.mkNormal).(Vect.neg).(Vect.fromNormal) $ incoming isect
   reflect lighti = Vect.reflect' (normal isect) (source lighti)
 
+illuminate (Texture pipeline) isect lights
+  = illuminate (pipeline (point isect)) isect lights
+
 -- |Pair between a material (IlluminationModel) and a primitive Object
 data LitObject = LitObject IlluminationModel Scene.Object
 
 -- |Transforms the underlying Object of a LitObject
-_tfLitObject :: (Scene.Object -> Scene.Object) -> LitObject -> LitObject
-_tfLitObject f (LitObject im o) = LitObject im (f o)
+_tfLitObject :: Vect.Proj4 -> LitObject -> LitObject
+_tfLitObject mat (LitObject t@(Texture _) o) =
+  LitObject (transformTexture mat t) (Scene.transform mat o)
+_tfLitObject mat (LitObject im o) = LitObject im (Scene.transform mat o)
 
 -- |Extended intersect function to maintain illumination model
 intersect :: Geom.Ray -> LitObject -> Maybe (IlluminationModel,
@@ -121,9 +152,9 @@ litTrace (LitScene background obs lis) ray = case intersections of
     dist light = Vect.len ((location light) &- (point idata))
 
 -- |Maps a transformation over all objects and lights
-litMapTrans :: LitScene -> (Scene.Object -> Scene.Object) -> LitScene
-litMapTrans (LitScene bg obs lis) f
-  = LitScene bg (map (_tfLitObject f) obs) (map (_tfLight f) lis)
+litMapTrans :: LitScene -> Vect.Proj4 -> LitScene
+litMapTrans (LitScene bg obs lis) mat
+  = LitScene bg (map (_tfLitObject mat) obs) (map (_tfLight mat) lis)
 
 -- |Makes an "instance" of Scene from LitScene
 toScene :: LitScene -> Scene.Scene
