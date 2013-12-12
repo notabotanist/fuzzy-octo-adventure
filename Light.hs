@@ -210,6 +210,22 @@ multiReflectStep coneRays coneSize (LitScene _ obs _) (k, ray) =
     srcDir = (Vect.mkNormal).(Vect.neg).(Vect.fromNormal) $
              (Geom.direction ray)
 
+type Rando = State StdGen
+
+depthlimitM :: Monad m => (b -> m (a, [b])) -> (Int, b) -> m (a, [(Int, b)])
+depthlimitM step = depthstep
+  where
+  depthstep (nn, b)
+    | nn <= 0   = do (a, bs) <- step b
+                     return (a, [])
+    | otherwise = do (a, bs) <- step b
+                     return (a, map ((,)(nn - 1)) bs)
+
+multiReflectStep' :: Int -> Float -> LitScene -> Rando (AndPower Geom.Ray) ->
+  (Rando (AndPower (Maybe Intersect)), [Rando (AndPower Geom.Ray)])
+multiReflectStep' coneRays coneSize (LitScene _ obs _) seed = undefined
+-- This doesn't make any sense.
+
 -- |Performs local illumination on an individual set of intersect data
 localIlluminate :: LitScene -> Maybe Intersect -> Radiance
 localIlluminate (LitScene bg _ _) Nothing = bg
@@ -248,10 +264,9 @@ litTrace maxd scene ray = collapse.(depthLimit maxd).build $ (1, ray) where
 -- They are distributed randomly according to the provided RandomGen
 litTraceCone :: Int -> Int -> Float -> StdGen -> LitScene -> Geom.Ray -> Radiance
 litTraceCone maxd coneRays coneAngle gen scene ray =
-  collapse.build $ (1, ray) where
+  collapse.build $ (maxd, (1, ray)) where
   build = ((flip evalState) gen).
-    (liftM (depthLimit maxd)).
-    unfoldTreeM_BF (multiReflectStep coneRays coneAngle scene)
+    (unfoldTreeM_BF.depthlimitM) (multiReflectStep coneRays coneAngle scene)
   collapse = foldMap powerLocal
   powerLocal (k, mi) = k `Vect.scalarMul` (localIlluminate scene mi)
 
