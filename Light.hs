@@ -284,5 +284,5 @@ toScene lit = Scene.Scene (toColorF.litTrace 5 lit) (toScene.litMapTrans lit)
 -- |Makes an "instance" of Scene from LitScene using multiple reflection rays
 multiReflectScene :: Int -> Float -> StdGen -> LitScene -> Scene.Scene
 multiReflectScene coneRays coneAngle gen lit =
-  Scene.Scene (toColorF.litTraceCone 2 coneRays coneAngle gen lit)
+  Scene.Scene (toColorF.litTraceCone 3 coneRays coneAngle gen lit)
               (multiReflectScene coneRays coneAngle gen.litMapTrans lit)

@@ -58,8 +58,8 @@ randomCone coneAxis theta gen =
       localVec = Vect.Vec3 (hypot * cos phi) (hypot * sin phi) z
   in ((Vect.mkNormal.alignPole) localVec, gen2) where
   alignPole vec
-    | (Vect._2.Vect.fromNormal) coneAxis ==   1  = vec
-    | (Vect._2.Vect.fromNormal) coneAxis == (-1) = Vect.neg vec
+    | (Vect._3.Vect.fromNormal) coneAxis ==   1  = vec
+    | (Vect._3.Vect.fromNormal) coneAxis == (-1) = Vect.neg vec
     | otherwise = Vect.rotate3 alignRot alignAxis vec where
-      alignAxis = Vect.crossprod (Vect.fromNormal coneAxis) (Vect.Vec3 0 0 1)
-      alignRot = acos ((Vect.fromNormal coneAxis) &. (Vect.Vec3 0 0 1))
+      alignAxis = Vect.crossprod (Vect.fromNormal coneAxis) (Vect.Vec3 0 0 (-1))
+      alignRot = acos ((Vect.fromNormal coneAxis) &. (Vect.Vec3 0 0 (-1)))
