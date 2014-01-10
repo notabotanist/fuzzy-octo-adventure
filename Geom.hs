@@ -2,6 +2,8 @@
 module Geom
   ( Point
   , Ray(..)
+  , Plane(..)
+  , BSP(..)
   , complementBasis
   , eval
   ) where
@@ -16,6 +18,21 @@ data Ray = Ray { origin :: Point, direction :: Normal3 }
 eval :: Ray -> Float -> Point
 eval (Ray origin dir) t = origin Vect.&+
                           (Vect.scalarMul t (Vect.fromNormal dir))
+
+-- |Representation of a plane with normal and distance to origin
+data Plane = Plane { n :: Normal3, d :: Float }
+
+-- |Solid-leaf Binary Space Partitioning tree.
+data BSP = Empty | Solid |
+  -- |Left child is the plane's positive half-space
+  Node { p :: Plane, left :: BSP, right :: BSP }
+
+-- Ray/BSP intersection helper function.  Takes tmin and tmax
+intersectRayBSP' :: BSP -> Ray -> Float -> Float -> Maybe Float
+intersectRayBSP' Empty _ _ _ = Nothing
+intersectRayBSP' Solid _ tmin _ = Just tmin
+intersectRayBSP' (BSP (Plane pn pd) l r) (Ray p d) tmin tmax =
+  undefined -- magic
 
 -- |From an input normal W, creates mutually perpendicular normals U and V
 -- such that {U,V,W} is an orthonormal basis (set of axes?).
