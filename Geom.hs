@@ -22,12 +22,19 @@ eval (Ray origin dir) t = origin Vect.&+
                           (Vect.scalarMul t (Vect.fromNormal dir))
 
 -- |Representation of a plane with normal and distance to origin
-data Plane = Plane { n :: Normal3, d :: Float }
+data Plane = Plane { n :: Normal3, d :: Float } deriving Show
+
+-- |Convert to this representation by specifying a normal and a point on the
+-- plane
+mkPlane :: Vec3 -> Point -> Plane
+mkPlane pn v = Plane (Vect.mkNormal pn)
+                     ((Vect.fromNormal.Vect.mkNormal) pn Vect.&. v)
 
 -- |Solid-leaf Binary Space Partitioning tree.
 data BSP = Empty | Full |
   -- |Left child is the plane's positive half-space
   Node { p :: Plane, left :: BSP, right :: BSP }
+  deriving Show
 
 -- Ray/BSP intersection helper function.  Takes tmin and tmax
 intersectRayBSP' :: BSP -> Ray -> Float -> Float -> Maybe Float

@@ -4,7 +4,7 @@ import Data.Vect ((&.),(&^),(&-),(&+)) -- operators (dot, cross)
 import qualified Data.Vect as Vect
 import qualified Geom
 import Control.Monad (guard, mplus)
-import Control.Applicative ((<$>))
+import Control.Applicative ((<$>),(<*>))
 import Data.Maybe (mapMaybe, catMaybes)
 import Data.List (minimumBy)
 
@@ -37,6 +37,8 @@ data Object
   -- |Cylinder data structure: center point, radius, height
   | Cylinder { center :: Geom.Point, axis :: Vect.Normal3,
                radius :: Float, height :: Float }
+  -- |Solid-leaf bsp tree: see Geom
+  | BSP { tree :: Geom.BSP }
   deriving (Show)
 
 -- |Colors are associated with objects at this point by type/location
@@ -44,6 +46,7 @@ objColor :: Object -> ColorF
 objColor (Triangle _ _ _) = (1.0, 0, 0)
 objColor (Sphere c _) = (0, 1.0, 0)
 objColor (Cylinder _ _ _ _) = (1.0, 1.0, 0)
+objColor (BSP _) = (0.4, 0.008, 0.24)
 
 -- |returns least positive argument
 ming0 :: Float -> Float -> Maybe Float
@@ -161,6 +164,19 @@ intersect (Geom.Ray rOrigin rDir) c@(Cylinder cOrigin cAxis cRadius cHeight)
         z = tValue * dz + vPz
     isect t = rOrigin &+ (t `Vect.scalarMul` (Vect.fromNormal rDir))
 
+-- BSP test
+intersect r b@(BSP obj)
+  = (,,) b <$> t <*> (norm obj =<< t)
+  where
+    t = Geom.intersectRayBSP obj r
+    -- find the normal by searching through the tree until we stumble across
+    -- a plane which happens to contain the t point
+    norm Geom.Empty _ = Nothing
+    norm Geom.Full  _ = Nothing
+    norm (Geom.Node (Geom.Plane pn pd) left right) t
+      | abs (pd - (Vect.fromNormal pn) Vect.&. (Geom.eval r t)) < 0.01 = Just pn
+      | otherwise = (norm left t) `mplus` (norm right t)
+
 
 _tfPoint :: Vect.Proj4 -> Geom.Point -> Geom.Point
 _tfPoint mat = (Vect.trim).((flip Vect.rmul) mat').mk4 where
@@ -180,6 +196,16 @@ transform mat (Triangle p1 p2 p3) = (Triangle (tf p1) (tf p2) (tf p3)) where
   tf = _tfPoint mat
 transform mat (Cylinder c a r h) =
   Cylinder (_tfPoint mat c) (_tfNorm mat a) r h
+transform mat (BSP tree) = BSP (_tfBSP tree)
+  where
+    _tfBSP Geom.Empty = Geom.Empty
+    _tfBSP Geom.Full = Geom.Full
+    _tfBSP (Geom.Node p l r) = Geom.Node (_tfPlane p) l r
+    _tfPlane (Geom.Plane pn pd) = Geom.Plane pn' pd'
+      where
+        pn' = _tfNorm mat pn
+        pd' = (Vect.fromNormal pn') Vect.&. (_tfPoint mat
+          (Vect.scalarMul pd (Vect.fromNormal pn))) 
 
 -- |data type for Object containers which might be considered Scenes
 data Scene = Scene { 

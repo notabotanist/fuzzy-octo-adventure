@@ -52,6 +52,11 @@ makeFloorQuad o e = [t1, t2] where
   c = o &+ w05 &+ h05
   d = o &+ w05 &- h05
 
+-- |Defines a convex hull for a rupee shape in a solid-leaf BSP
+rupee :: Geom.Point -> Geom.BSP
+rupee c = Node (Geom.mkPlane (Vect.Vec3 0 0 (-1))
+               ((Vect.Vec3 0 0 (-0.5)) Vect.&+ c) Geom.Empty Geom.Full
+
 -- |Creates a scene and populates it with the assignment's objects
 myScene :: Light.LitScene
 myScene = Light.LitScene bgColor objects lights where
