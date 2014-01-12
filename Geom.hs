@@ -25,14 +25,14 @@ eval (Ray origin dir) t = origin Vect.&+
 data Plane = Plane { n :: Normal3, d :: Float }
 
 -- |Solid-leaf Binary Space Partitioning tree.
-data BSP = Empty | Solid |
+data BSP = Empty | Full |
   -- |Left child is the plane's positive half-space
   Node { p :: Plane, left :: BSP, right :: BSP }
 
 -- Ray/BSP intersection helper function.  Takes tmin and tmax
 intersectRayBSP' :: BSP -> Ray -> Float -> Float -> Maybe Float
 intersectRayBSP' Empty _ _ _ = Nothing
-intersectRayBSP' Solid _ tmin _ = Just tmin
+intersectRayBSP' Full _ tmin _ = Just tmin
 intersectRayBSP' (Node (Plane pn pd) l r) ray@(Ray p d) tmin tmax
   | (denom == 0) || (t < 0) || (t > tmax)
     = intersectRayBSP' nearSide ray tmin tmax
@@ -44,11 +44,11 @@ intersectRayBSP' (Node (Plane pn pd) l r) ray@(Ray p d) tmin tmax
     dist = pd - ((Vect.fromNormal pn) Vect.&. p)
     t = dist / denom
     nearSide
-      | dist > 0  = l
-      | otherwise = r
-    farSide
       | dist > 0  = r
       | otherwise = l
+    farSide
+      | dist > 0  = l
+      | otherwise = r
 
 -- |Ray/BSP intersection
 intersectRayBSP :: BSP -> Ray -> Maybe Float
