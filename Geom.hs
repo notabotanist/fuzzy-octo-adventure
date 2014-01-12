@@ -4,12 +4,14 @@ module Geom
   , Ray(..)
   , Plane(..)
   , BSP(..)
+  , intersectRayBSP
   , complementBasis
   , eval
   ) where
 
 import Data.Vect (Vec3, Normal3)
 import qualified Data.Vect as Vect
+import Control.Monad (mplus)
 
 type Point = Vec3
 
@@ -31,8 +33,26 @@ data BSP = Empty | Solid |
 intersectRayBSP' :: BSP -> Ray -> Float -> Float -> Maybe Float
 intersectRayBSP' Empty _ _ _ = Nothing
 intersectRayBSP' Solid _ tmin _ = Just tmin
-intersectRayBSP' (BSP (Plane pn pd) l r) (Ray p d) tmin tmax =
-  undefined -- magic
+intersectRayBSP' (Node (Plane pn pd) l r) ray@(Ray p d) tmin tmax
+  | (denom == 0) || (t < 0) || (t > tmax)
+    = intersectRayBSP' nearSide ray tmin tmax
+  | (t < tmin) = intersectRayBSP' farSide ray tmin tmax
+  | otherwise  = intersectRayBSP' nearSide ray tmin t
+    `mplus` intersectRayBSP' farSide ray t tmax
+  where
+    denom = (Vect.fromNormal pn) Vect.&. (Vect.fromNormal d)
+    dist = pd - ((Vect.fromNormal pn) Vect.&. p)
+    t = dist / denom
+    nearSide
+      | dist > 0  = l
+      | otherwise = r
+    farSide
+      | dist > 0  = r
+      | otherwise = l
+
+-- |Ray/BSP intersection
+intersectRayBSP :: BSP -> Ray -> Maybe Float
+intersectRayBSP b r = intersectRayBSP' b r 0 (read "Infinity")
 
 -- |From an input normal W, creates mutually perpendicular normals U and V
 -- such that {U,V,W} is an orthonormal basis (set of axes?).
